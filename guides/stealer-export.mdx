@@ -1,0 +1,134 @@
+---
+title: "Stealer Export"
+description: "Download every stealer log attached to one System ID, as a single .zip archive."
+---
+
+Stealer Export takes one `system_id` and returns **every stealer log attached to it**, packed into a single `.zip` archive.
+
+```text
+POST https://findly.icu/api/v1/stealer-export
+```
+
+<Note>
+  This is the only endpoint that answers with a **file** on success. Errors still use the JSON envelope, so branch on
+  the status code before reading the body. It is not a search module: `/api/v1/search/stealer-export` returns
+  `400 not_a_search_module`.
+</Note>
+
+## What you need
+
+<ParamField body="system_id" type="string" required>
+  The System ID of the record — a UUID, `8-4-4-4-12` hexadecimal characters. On intelx.io, open the record and unfold
+  **Expert Information**; it is the first identifier listed.
+</ParamField>
+
+Nothing else. Unknown fields are rejected with `422 invalid_input`, so a typo such as `systemId` is reported instead of ignored.
+
+## Plans and cost
+
+| | |
+| --- | --- |
+| Plans | **Professional and Enterprise** |
+| Cost | **1 request per export**, whatever the archive holds |
+| Given back | service failure, timeout, no logs found, archive over 32 MB |
+| Concurrency | one export at a time per account |
+
+A `403 module_locked` on Free or Starter costs nothing and never reaches the export service.
+
+## Call it
+
+```bash
+curl https://findly.icu/api/v1/stealer-export \
+  -H "Authorization: Bearer fly_live_XXXX" \
+  -H "Content-Type: application/json" \
+  -d '{"system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"}' \
+  --fail-with-body \
+  -o stealer-export.zip
+```
+
+`--fail-with-body` matters: without it, curl happily writes a JSON error into a file named `.zip`.
+
+<CodeGroup>
+
+```python Python
+import requests
+
+res = requests.post(
+    "https://findly.icu/api/v1/stealer-export",
+    headers={"Authorization": "Bearer fly_live_XXXX"},
+    json={"system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"},
+    timeout=60,
+)
+
+if res.headers.get("content-type", "").startswith("application/zip"):
+    with open("stealer-export.zip", "wb") as out:
+        out.write(res.content)
+    print("saved", len(res.content), "bytes,",
+          res.headers.get("X-Quota-Remaining"), "requests left today")
+else:
+    error = res.json()["error"]
+    print(res.status_code, error["code"], error["message"])
+```
+
+```javascript JavaScript
+const res = await fetch('https://findly.icu/api/v1/stealer-export', {
+  method: 'POST',
+  headers: {
+    Authorization: 'Bearer fly_live_XXXX',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ system_id: '3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13' }),
+});
+
+if (res.ok) {
+  const buffer = Buffer.from(await res.arrayBuffer());
+  await writeFile('stealer-export.zip', buffer);
+} else {
+  const { error } = await res.json();
+  console.error(res.status, error.code, error.message);
+}
+```
+
+</CodeGroup>
+
+## Reading the response
+
+On success you get the archive and the usual quota headers:
+
+| Header | What it says |
+| --- | --- |
+| `Content-Type` | `application/zip` |
+| `Content-Disposition` | `attachment; filename="…zip"` — the suggested name |
+| `Content-Length` | Size of the archive, in bytes |
+| `X-Request-Billed` | `true` |
+| `X-Quota-Remaining` | Requests left today |
+
+On failure you get JSON:
+
+```json
+{
+  "error": {
+    "code": "not_found",
+    "message": "No stealer logs are attached to this system_id."
+  },
+  "billed": false,
+  "usage": { "plan": "Professional", "remaining": 486, "resets_at": "2026-09-19T00:00:00.000Z" }
+}
+```
+
+## Errors worth handling
+
+| Status | Code | Meaning | Billed |
+| --- | --- | --- | --- |
+| 403 | `module_locked` | Your plan does not include Stealer Export | No |
+| 404 | `not_found` | Valid System ID, but no stealer logs attached | No — given back |
+| 422 | `invalid_input` | `system_id` missing or not a UUID | No |
+| 429 | `rate_limited` | An export is already running, or 20 requests in the last minute | No |
+| 429 | `quota_exceeded` | Daily quota reached | No |
+| 502 | `upstream_error` | Service failed, timed out, or archive over 32 MB | No — given back |
+
+<Warning>
+  Archives hold credentials taken from infected machines. Treat every file inside as untrusted input: never execute it,
+  escape it before displaying it, and store it somewhere you would be comfortable defending. Find.ly streams the archive
+  through and keeps nothing.
+</Warning>

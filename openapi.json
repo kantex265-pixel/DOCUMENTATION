@@ -1,0 +1,3885 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Find.ly API",
+    "version": "1.0.0",
+    "description": "Search leak and OSINT data from your own code with the same five modules, quota and limits as the Find.ly dashboard. API access comes with the Professional and Enterprise plans.\n\nEvery search is `POST /api/v1/search/{module}`, where `{module}` is one of `intelligence-search`, `phonebook`, `identity-portal`, `system-id`, `storage-id`. Each module has its own reference page below because each takes a different body."
+  },
+  "servers": [
+    {
+      "url": "https://findly.icu",
+      "description": "Production"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    },
+    {
+      "apiKeyHeader": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Account",
+      "description": "Plan and quota. Free: never billed."
+    },
+    {
+      "name": "Search",
+      "description": "One request per served search."
+    },
+    {
+      "name": "Export",
+      "description": "Bulk downloads that return a file instead of JSON."
+    }
+  ],
+  "paths": {
+    "/api/v1/usage": {
+      "get": {
+        "operationId": "get_usage",
+        "tags": [
+          "Account"
+        ],
+        "summary": "Get usage",
+        "description": "Returns the plan, today's quota and the modules open to the account that owns the key. Never billed and never runs a search: use it to check that a key works.",
+        "responses": {
+          "200": {
+            "description": "Plan, quota and modules. `billed` is always `false`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageResponse"
+                },
+                "examples": {
+                  "usage": {
+                    "value": {
+                      "username": "acme-security",
+                      "modules": [
+                        "intelligence-search",
+                        "phonebook",
+                        "identity-portal",
+                        "system-id",
+                        "storage-id"
+                      ],
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request. `api_key_in_url`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "api_key_in_url": {
+                    "value": {
+                      "error": {
+                        "code": "api_key_in_url",
+                        "message": "Send your API key in the Authorization header, never in the URL. If it was logged somewhere, regenerate it from your dashboard."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key. `missing_api_key`, `invalid_api_key`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "WWW-Authenticate": {
+                "$ref": "#/components/headers/WWWAuthenticate"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missing_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "missing_api_key",
+                        "message": "Send your API key in the Authorization header: \"Authorization: Bearer fly_live_…\"."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "invalid_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_api_key",
+                        "message": "This API key is not valid. Copy it again from the API page of your dashboard."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access refused. `account_suspended`, or `plan_required` (the plan has no API access; carries `usage` and `X-Quota-*`).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "account_suspended": {
+                    "value": {
+                      "error": {
+                        "code": "account_suspended",
+                        "message": "This account is suspended. If you think this is a mistake, contact us."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "plan_required": {
+                    "value": {
+                      "error": {
+                        "code": "plan_required",
+                        "message": "Your Starter plan doesn’t include API access. It comes with the Professional and Enterprise plans.",
+                        "plan": "Starter"
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Starter",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 100,
+                        "used": 0,
+                        "remaining": 100,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many calls from this IP address. `too_many_requests`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "too_many_requests": {
+                    "value": {
+                      "error": {
+                        "code": "too_many_requests",
+                        "message": "Too many API calls from this address. Slow down and try again."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. `internal_error`. No request was used.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "internal_error": {
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "Something went wrong on our side. No request was used."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/search/intelligence-search": {
+      "post": {
+        "operationId": "search_intelligence_search",
+        "tags": [
+          "Search"
+        ],
+        "summary": "Intelligence Search",
+        "description": "Free-text search by email, username, domain or keyword, with optional result count, media type, sort order and date filters. Returns up to 5,000 records in one response.",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "Only `json` (the default) is accepted. `txt` returns `400 unsupported_format`.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json"
+              ],
+              "default": "json"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntelligenceSearchRequest"
+              },
+              "examples": {
+                "request": {
+                  "value": {
+                    "query": "example.com",
+                    "max_results": 100,
+                    "sort_order": "date_desc",
+                    "date_from": "2024-01-01",
+                    "date_to": "2024-12-31"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search served (billed), including a successful empty result.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordsResponse"
+                },
+                "examples": {
+                  "results": {
+                    "value": {
+                      "module": "intelligence-search",
+                      "query": "example.com",
+                      "total": 1,
+                      "returned": 1,
+                      "truncated": false,
+                      "results": [
+                        {
+                          "name": "combolist_2024_part3.txt",
+                          "date": "2024-03-18T09:41:07.000Z",
+                          "date_raw": "2024-03-18 09:41:07",
+                          "bucket": "leaks.private.general",
+                          "size_bytes": 48213,
+                          "media_type": "Text file",
+                          "system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13",
+                          "line": "john.doe@example.com:…",
+                          "line_clipped": false
+                        }
+                      ],
+                      "billed": true,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  },
+                  "empty": {
+                    "value": {
+                      "module": "intelligence-search",
+                      "query": "example.com",
+                      "total": 0,
+                      "returned": 0,
+                      "truncated": false,
+                      "results": [],
+                      "billed": true,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request. `api_key_in_url`, `unsupported_format`, `invalid_json`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "api_key_in_url": {
+                    "value": {
+                      "error": {
+                        "code": "api_key_in_url",
+                        "message": "Send your API key in the Authorization header, never in the URL. If it was logged somewhere, regenerate it from your dashboard."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "unsupported_format": {
+                    "value": {
+                      "error": {
+                        "code": "unsupported_format",
+                        "message": "format must be json for Intelligence Search. No request was used."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "invalid_json": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_json",
+                        "message": "Send a JSON object in the request body, with Content-Type: application/json."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key. `missing_api_key`, `invalid_api_key`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "WWW-Authenticate": {
+                "$ref": "#/components/headers/WWWAuthenticate"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missing_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "missing_api_key",
+                        "message": "Send your API key in the Authorization header: \"Authorization: Bearer fly_live_…\"."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "invalid_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_api_key",
+                        "message": "This API key is not valid. Copy it again from the API page of your dashboard."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`account_suspended`, `plan_required`, or `module_locked` (the plan does not include this module; carries `required_plan`). `module_locked` only happens if the plan expires during the call.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "account_suspended": {
+                    "value": {
+                      "error": {
+                        "code": "account_suspended",
+                        "message": "This account is suspended. If you think this is a mistake, contact us."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "plan_required": {
+                    "value": {
+                      "error": {
+                        "code": "plan_required",
+                        "message": "Your Starter plan doesn’t include API access. It comes with the Professional and Enterprise plans.",
+                        "plan": "Starter"
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Starter",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 100,
+                        "used": 0,
+                        "remaining": 100,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  },
+                  "module_locked": {
+                    "value": {
+                      "error": {
+                        "code": "module_locked",
+                        "message": "Intelligence Search requires the Starter plan.",
+                        "required_plan": "Starter"
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body over 16 KB. `body_too_large`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "body_too_large": {
+                    "value": {
+                      "error": {
+                        "code": "body_too_large",
+                        "message": "The request body must be 16 KB or less."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input, not billed. `invalid_input` with one message per field in `error.fields`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid_input": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_input",
+                        "message": "Some fields are invalid. No request was used.",
+                        "fields": {
+                          "max_results": "Max results must be a whole number between 1 and 1000."
+                        }
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` (per IP), `quota_exceeded` (daily quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent` or `per-minute`). Always sends `Retry-After`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "too_many_requests": {
+                    "value": {
+                      "error": {
+                        "code": "too_many_requests",
+                        "message": "Too many API calls from this address. Slow down and try again."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "quota_exceeded": {
+                    "value": {
+                      "error": {
+                        "code": "quota_exceeded",
+                        "message": "You’ve used all of today’s requests. Your quota resets at 02:00 Paris time."
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 500,
+                        "remaining": 0,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  },
+                  "rate_limited_concurrent": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Two searches are already running on this account. Try again when one finishes.",
+                        "reason": "concurrent"
+                      },
+                      "billed": false
+                    }
+                  },
+                  "rate_limited_per_minute": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many searches in the last minute. Try again shortly.",
+                        "reason": "per-minute"
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. `internal_error`. No request was used.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "internal_error": {
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "Something went wrong on our side. No request was used."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The search service failed. `upstream_error`. The request is refunded (`billed: false`).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "upstream_error": {
+                    "value": {
+                      "error": {
+                        "code": "upstream_error",
+                        "message": "Search is unavailable on our side right now. It’s not your plan or your quota.",
+                        "upstream_status": null
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/search/phonebook": {
+      "post": {
+        "operationId": "search_phonebook",
+        "tags": [
+          "Search"
+        ],
+        "summary": "Phonebook",
+        "description": "Lists every known selector for a domain: email addresses (`type: email`), subdomains (`type: domain`) or URLs (`type: url`). Up to 5,000 selectors per response, or a plain text list with `?format=txt`.",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "`json` (default) or `txt`. Same search, same price, different output.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "txt"
+              ],
+              "default": "json"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhonebookRequest"
+              },
+              "examples": {
+                "request": {
+                  "value": {
+                    "type": "email",
+                    "query": "@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search served (billed). JSON by default; with `?format=txt`, a `text/plain` attachment named `phonebook-{type}-{query}.txt`, one selector per line, with `X-Results-Total` and `X-Results-Truncated`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              },
+              "Content-Disposition": {
+                "$ref": "#/components/headers/ContentDisposition"
+              },
+              "X-Results-Total": {
+                "$ref": "#/components/headers/XResultsTotal"
+              },
+              "X-Results-Truncated": {
+                "$ref": "#/components/headers/XResultsTruncated"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelectorsResponse"
+                },
+                "examples": {
+                  "results": {
+                    "value": {
+                      "module": "phonebook",
+                      "query": "@example.com",
+                      "type": "email",
+                      "total": 2,
+                      "returned": 2,
+                      "truncated": false,
+                      "results": [
+                        {
+                          "selector": "john.doe@example.com",
+                          "date": "2023-11-02T00:00:00.000Z",
+                          "date_raw": "2023-11-02"
+                        },
+                        {
+                          "selector": "jane@example.com",
+                          "date": null,
+                          "date_raw": null
+                        }
+                      ],
+                      "billed": true,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  },
+                  "empty": {
+                    "value": {
+                      "module": "phonebook",
+                      "query": "@example.com",
+                      "type": "email",
+                      "total": 0,
+                      "returned": 0,
+                      "truncated": false,
+                      "results": [],
+                      "billed": true,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "text": {
+                    "value": "john.doe@example.com\njane@example.com\n"
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Only with `?format=txt`: the search succeeded but returned nothing. No body; `X-Request-Billed` says whether it was billed.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request. `api_key_in_url`, `unsupported_format`, `invalid_json`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "api_key_in_url": {
+                    "value": {
+                      "error": {
+                        "code": "api_key_in_url",
+                        "message": "Send your API key in the Authorization header, never in the URL. If it was logged somewhere, regenerate it from your dashboard."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "unsupported_format": {
+                    "value": {
+                      "error": {
+                        "code": "unsupported_format",
+                        "message": "format must be json or txt for Phonebook. No request was used."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "invalid_json": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_json",
+                        "message": "Send a JSON object in the request body, with Content-Type: application/json."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key. `missing_api_key`, `invalid_api_key`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "WWW-Authenticate": {
+                "$ref": "#/components/headers/WWWAuthenticate"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missing_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "missing_api_key",
+                        "message": "Send your API key in the Authorization header: \"Authorization: Bearer fly_live_…\"."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "invalid_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_api_key",
+                        "message": "This API key is not valid. Copy it again from the API page of your dashboard."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`account_suspended`, `plan_required`, or `module_locked` (the plan does not include this module; carries `required_plan`). `module_locked` only happens if the plan expires during the call.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "account_suspended": {
+                    "value": {
+                      "error": {
+                        "code": "account_suspended",
+                        "message": "This account is suspended. If you think this is a mistake, contact us."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "plan_required": {
+                    "value": {
+                      "error": {
+                        "code": "plan_required",
+                        "message": "Your Starter plan doesn’t include API access. It comes with the Professional and Enterprise plans.",
+                        "plan": "Starter"
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Starter",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 100,
+                        "used": 0,
+                        "remaining": 100,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  },
+                  "module_locked": {
+                    "value": {
+                      "error": {
+                        "code": "module_locked",
+                        "message": "Phonebook requires the Professional plan.",
+                        "required_plan": "Professional"
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body over 16 KB. `body_too_large`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "body_too_large": {
+                    "value": {
+                      "error": {
+                        "code": "body_too_large",
+                        "message": "The request body must be 16 KB or less."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input, not billed. `invalid_input` with one message per field in `error.fields`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid_input": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_input",
+                        "message": "Some fields are invalid. No request was used.",
+                        "fields": {
+                          "query": "For emails, enter a domain starting with @ — for example @openai.com."
+                        }
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` (per IP), `quota_exceeded` (daily quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent` or `per-minute`). Always sends `Retry-After`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "too_many_requests": {
+                    "value": {
+                      "error": {
+                        "code": "too_many_requests",
+                        "message": "Too many API calls from this address. Slow down and try again."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "quota_exceeded": {
+                    "value": {
+                      "error": {
+                        "code": "quota_exceeded",
+                        "message": "You’ve used all of today’s requests. Your quota resets at 02:00 Paris time."
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 500,
+                        "remaining": 0,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  },
+                  "rate_limited_concurrent": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Two searches are already running on this account. Try again when one finishes.",
+                        "reason": "concurrent"
+                      },
+                      "billed": false
+                    }
+                  },
+                  "rate_limited_per_minute": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many searches in the last minute. Try again shortly.",
+                        "reason": "per-minute"
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. `internal_error`. No request was used.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "internal_error": {
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "Something went wrong on our side. No request was used."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The search service failed. `upstream_error`. The request is refunded (`billed: false`).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "upstream_error": {
+                    "value": {
+                      "error": {
+                        "code": "upstream_error",
+                        "message": "Search is unavailable on our side right now. It’s not your plan or your quota.",
+                        "upstream_status": null
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/search/identity-portal": {
+      "post": {
+        "operationId": "search_identity_portal",
+        "tags": [
+          "Search"
+        ],
+        "summary": "Identity Portal",
+        "description": "Looks up an email address, domain or other selector and returns the matching records, in the same shape as Intelligence Search.",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "Only `json` (the default) is accepted. `txt` returns `400 unsupported_format`.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json"
+              ],
+              "default": "json"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityPortalRequest"
+              },
+              "examples": {
+                "request": {
+                  "value": {
+                    "query": "john.doe@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search served (billed), including a successful empty result.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordsResponse"
+                },
+                "examples": {
+                  "results": {
+                    "value": {
+                      "module": "identity-portal",
+                      "query": "john.doe@example.com",
+                      "total": 1,
+                      "returned": 1,
+                      "truncated": false,
+                      "results": [
+                        {
+                          "name": "combolist_2024_part3.txt",
+                          "date": "2024-03-18T09:41:07.000Z",
+                          "date_raw": "2024-03-18 09:41:07",
+                          "bucket": "leaks.private.general",
+                          "size_bytes": 48213,
+                          "media_type": "Text file",
+                          "system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13",
+                          "line": "john.doe@example.com:…",
+                          "line_clipped": false
+                        }
+                      ],
+                      "billed": true,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  },
+                  "empty": {
+                    "value": {
+                      "module": "identity-portal",
+                      "query": "john.doe@example.com",
+                      "total": 0,
+                      "returned": 0,
+                      "truncated": false,
+                      "results": [],
+                      "billed": true,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request. `api_key_in_url`, `unsupported_format`, `invalid_json`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "api_key_in_url": {
+                    "value": {
+                      "error": {
+                        "code": "api_key_in_url",
+                        "message": "Send your API key in the Authorization header, never in the URL. If it was logged somewhere, regenerate it from your dashboard."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "unsupported_format": {
+                    "value": {
+                      "error": {
+                        "code": "unsupported_format",
+                        "message": "format must be json for Identity Portal. No request was used."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "invalid_json": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_json",
+                        "message": "Send a JSON object in the request body, with Content-Type: application/json."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key. `missing_api_key`, `invalid_api_key`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "WWW-Authenticate": {
+                "$ref": "#/components/headers/WWWAuthenticate"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missing_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "missing_api_key",
+                        "message": "Send your API key in the Authorization header: \"Authorization: Bearer fly_live_…\"."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "invalid_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_api_key",
+                        "message": "This API key is not valid. Copy it again from the API page of your dashboard."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`account_suspended`, `plan_required`, or `module_locked` (the plan does not include this module; carries `required_plan`). `module_locked` only happens if the plan expires during the call.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "account_suspended": {
+                    "value": {
+                      "error": {
+                        "code": "account_suspended",
+                        "message": "This account is suspended. If you think this is a mistake, contact us."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "plan_required": {
+                    "value": {
+                      "error": {
+                        "code": "plan_required",
+                        "message": "Your Starter plan doesn’t include API access. It comes with the Professional and Enterprise plans.",
+                        "plan": "Starter"
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Starter",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 100,
+                        "used": 0,
+                        "remaining": 100,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  },
+                  "module_locked": {
+                    "value": {
+                      "error": {
+                        "code": "module_locked",
+                        "message": "Identity Portal requires the Professional plan.",
+                        "required_plan": "Professional"
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body over 16 KB. `body_too_large`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "body_too_large": {
+                    "value": {
+                      "error": {
+                        "code": "body_too_large",
+                        "message": "The request body must be 16 KB or less."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input, not billed. `invalid_input` with one message per field in `error.fields`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid_input": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_input",
+                        "message": "Some fields are invalid. No request was used.",
+                        "fields": {
+                          "query": "Enter an email address, domain or other selector."
+                        }
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` (per IP), `quota_exceeded` (daily quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent` or `per-minute`). Always sends `Retry-After`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "too_many_requests": {
+                    "value": {
+                      "error": {
+                        "code": "too_many_requests",
+                        "message": "Too many API calls from this address. Slow down and try again."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "quota_exceeded": {
+                    "value": {
+                      "error": {
+                        "code": "quota_exceeded",
+                        "message": "You’ve used all of today’s requests. Your quota resets at 02:00 Paris time."
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 500,
+                        "remaining": 0,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  },
+                  "rate_limited_concurrent": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Two searches are already running on this account. Try again when one finishes.",
+                        "reason": "concurrent"
+                      },
+                      "billed": false
+                    }
+                  },
+                  "rate_limited_per_minute": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many searches in the last minute. Try again shortly.",
+                        "reason": "per-minute"
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. `internal_error`. No request was used.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "internal_error": {
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "Something went wrong on our side. No request was used."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The search service failed. `upstream_error`. The request is refunded (`billed: false`).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "upstream_error": {
+                    "value": {
+                      "error": {
+                        "code": "upstream_error",
+                        "message": "Search is unavailable on our side right now. It’s not your plan or your quota.",
+                        "upstream_status": null
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/search/system-id": {
+      "post": {
+        "operationId": "search_system_id",
+        "tags": [
+          "Search"
+        ],
+        "summary": "System ID (raw file)",
+        "description": "Downloads the raw file behind a result. Pass the `system_id` of a record from Intelligence Search or Identity Portal. The file text (first 8 MB) comes back in JSON, or as a `text/plain` attachment with `?format=txt`.",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "`json` (default) or `txt`. Same search, same price, different output.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "txt"
+              ],
+              "default": "json"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SystemIdRequest"
+              },
+              "examples": {
+                "request": {
+                  "value": {
+                    "system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search served (billed). JSON by default; with `?format=txt`, the file itself as a `text/plain` attachment, with `X-File-Truncated` and `X-File-Total-Bytes`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              },
+              "Content-Disposition": {
+                "$ref": "#/components/headers/ContentDisposition"
+              },
+              "X-File-Truncated": {
+                "$ref": "#/components/headers/XFileTruncated"
+              },
+              "X-File-Total-Bytes": {
+                "$ref": "#/components/headers/XFileTotalBytes"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemIdResponse"
+                },
+                "examples": {
+                  "results": {
+                    "value": {
+                      "module": "system-id",
+                      "system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13",
+                      "file": {
+                        "name": "uuid-3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13.txt",
+                        "bytes": 54,
+                        "lines": 2,
+                        "truncated": false,
+                        "total_bytes": 54,
+                        "text": "john.doe@example.com:hunter2\njane@example.com:letmein\n"
+                      },
+                      "billed": true,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  },
+                  "empty": {
+                    "value": {
+                      "module": "system-id",
+                      "system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13",
+                      "file": null,
+                      "billed": true,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "text": {
+                    "value": "john.doe@example.com:hunter2\njane@example.com:letmein\n"
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Only with `?format=txt`: the search succeeded but returned nothing. No body; `X-Request-Billed` says whether it was billed.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request. `api_key_in_url`, `unsupported_format`, `invalid_json`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "api_key_in_url": {
+                    "value": {
+                      "error": {
+                        "code": "api_key_in_url",
+                        "message": "Send your API key in the Authorization header, never in the URL. If it was logged somewhere, regenerate it from your dashboard."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "unsupported_format": {
+                    "value": {
+                      "error": {
+                        "code": "unsupported_format",
+                        "message": "format must be json or txt for System ID. No request was used."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "invalid_json": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_json",
+                        "message": "Send a JSON object in the request body, with Content-Type: application/json."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key. `missing_api_key`, `invalid_api_key`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "WWW-Authenticate": {
+                "$ref": "#/components/headers/WWWAuthenticate"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missing_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "missing_api_key",
+                        "message": "Send your API key in the Authorization header: \"Authorization: Bearer fly_live_…\"."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "invalid_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_api_key",
+                        "message": "This API key is not valid. Copy it again from the API page of your dashboard."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`account_suspended` or `plan_required`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "account_suspended": {
+                    "value": {
+                      "error": {
+                        "code": "account_suspended",
+                        "message": "This account is suspended. If you think this is a mistake, contact us."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "plan_required": {
+                    "value": {
+                      "error": {
+                        "code": "plan_required",
+                        "message": "Your Starter plan doesn’t include API access. It comes with the Professional and Enterprise plans.",
+                        "plan": "Starter"
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Starter",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 100,
+                        "used": 0,
+                        "remaining": 100,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body over 16 KB. `body_too_large`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "body_too_large": {
+                    "value": {
+                      "error": {
+                        "code": "body_too_large",
+                        "message": "The request body must be 16 KB or less."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input, not billed. `invalid_input` with one message per field in `error.fields`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid_input": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_input",
+                        "message": "Some fields are invalid. No request was used.",
+                        "fields": {
+                          "system_id": "System ID must be a UUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)."
+                        }
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` (per IP), `quota_exceeded` (daily quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent` or `per-minute`). Always sends `Retry-After`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "too_many_requests": {
+                    "value": {
+                      "error": {
+                        "code": "too_many_requests",
+                        "message": "Too many API calls from this address. Slow down and try again."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "quota_exceeded": {
+                    "value": {
+                      "error": {
+                        "code": "quota_exceeded",
+                        "message": "You’ve used all of today’s requests. Your quota resets at 02:00 Paris time."
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 500,
+                        "remaining": 0,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  },
+                  "rate_limited_concurrent": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Two searches are already running on this account. Try again when one finishes.",
+                        "reason": "concurrent"
+                      },
+                      "billed": false
+                    }
+                  },
+                  "rate_limited_per_minute": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many searches in the last minute. Try again shortly.",
+                        "reason": "per-minute"
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. `internal_error`. No request was used.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "internal_error": {
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "Something went wrong on our side. No request was used."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The search service failed. `upstream_error`. The request is refunded (`billed: false`).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "upstream_error": {
+                    "value": {
+                      "error": {
+                        "code": "upstream_error",
+                        "message": "Search is unavailable on our side right now. It’s not your plan or your quota.",
+                        "upstream_status": null
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/search/storage-id": {
+      "post": {
+        "operationId": "search_storage_id",
+        "tags": [
+          "Search"
+        ],
+        "summary": "Storage ID (raw file)",
+        "description": "Downloads a raw file by its storage ID and bucket. The file text (first 8 MB) comes back in JSON, or as a `text/plain` attachment with `?format=txt`.",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "`json` (default) or `txt`. Same search, same price, different output.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "txt"
+              ],
+              "default": "json"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageIdRequest"
+              },
+              "examples": {
+                "request": {
+                  "value": {
+                    "storage_id": "a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1",
+                    "bucket": "leaks.private.general"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search served (billed). JSON by default; with `?format=txt`, the file itself as a `text/plain` attachment, with `X-File-Truncated` and `X-File-Total-Bytes`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              },
+              "Content-Disposition": {
+                "$ref": "#/components/headers/ContentDisposition"
+              },
+              "X-File-Truncated": {
+                "$ref": "#/components/headers/XFileTruncated"
+              },
+              "X-File-Total-Bytes": {
+                "$ref": "#/components/headers/XFileTotalBytes"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageIdResponse"
+                },
+                "examples": {
+                  "results": {
+                    "value": {
+                      "module": "storage-id",
+                      "storage_id": "a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1",
+                      "bucket": "leaks.private.general",
+                      "file": {
+                        "name": "storage-a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1.txt",
+                        "bytes": 54,
+                        "lines": 2,
+                        "truncated": false,
+                        "total_bytes": 54,
+                        "text": "john.doe@example.com:hunter2\njane@example.com:letmein\n"
+                      },
+                      "billed": true,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  },
+                  "empty": {
+                    "value": {
+                      "module": "storage-id",
+                      "storage_id": "a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1a3f1",
+                      "bucket": "leaks.private.general",
+                      "file": null,
+                      "billed": true,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "text": {
+                    "value": "john.doe@example.com:hunter2\njane@example.com:letmein\n"
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Only with `?format=txt`: the search succeeded but returned nothing. No body; `X-Request-Billed` says whether it was billed.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request. `api_key_in_url`, `unsupported_format`, `invalid_json`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "api_key_in_url": {
+                    "value": {
+                      "error": {
+                        "code": "api_key_in_url",
+                        "message": "Send your API key in the Authorization header, never in the URL. If it was logged somewhere, regenerate it from your dashboard."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "unsupported_format": {
+                    "value": {
+                      "error": {
+                        "code": "unsupported_format",
+                        "message": "format must be json or txt for Storage ID. No request was used."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "invalid_json": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_json",
+                        "message": "Send a JSON object in the request body, with Content-Type: application/json."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key. `missing_api_key`, `invalid_api_key`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "WWW-Authenticate": {
+                "$ref": "#/components/headers/WWWAuthenticate"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missing_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "missing_api_key",
+                        "message": "Send your API key in the Authorization header: \"Authorization: Bearer fly_live_…\"."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "invalid_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_api_key",
+                        "message": "This API key is not valid. Copy it again from the API page of your dashboard."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`account_suspended` or `plan_required`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "account_suspended": {
+                    "value": {
+                      "error": {
+                        "code": "account_suspended",
+                        "message": "This account is suspended. If you think this is a mistake, contact us."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "plan_required": {
+                    "value": {
+                      "error": {
+                        "code": "plan_required",
+                        "message": "Your Starter plan doesn’t include API access. It comes with the Professional and Enterprise plans.",
+                        "plan": "Starter"
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Starter",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 100,
+                        "used": 0,
+                        "remaining": 100,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body over 16 KB. `body_too_large`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "body_too_large": {
+                    "value": {
+                      "error": {
+                        "code": "body_too_large",
+                        "message": "The request body must be 16 KB or less."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input, not billed. `invalid_input` with one message per field in `error.fields`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid_input": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_input",
+                        "message": "Some fields are invalid. No request was used.",
+                        "fields": {
+                          "bucket": "Choose one of the listed buckets."
+                        }
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` (per IP), `quota_exceeded` (daily quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent` or `per-minute`). Always sends `Retry-After`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "too_many_requests": {
+                    "value": {
+                      "error": {
+                        "code": "too_many_requests",
+                        "message": "Too many API calls from this address. Slow down and try again."
+                      },
+                      "billed": false
+                    }
+                  },
+                  "quota_exceeded": {
+                    "value": {
+                      "error": {
+                        "code": "quota_exceeded",
+                        "message": "You’ve used all of today’s requests. Your quota resets at 02:00 Paris time."
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 500,
+                        "remaining": 0,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  },
+                  "rate_limited_concurrent": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Two searches are already running on this account. Try again when one finishes.",
+                        "reason": "concurrent"
+                      },
+                      "billed": false
+                    }
+                  },
+                  "rate_limited_per_minute": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many searches in the last minute. Try again shortly.",
+                        "reason": "per-minute"
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. `internal_error`. No request was used.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "internal_error": {
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "Something went wrong on our side. No request was used."
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The search service failed. `upstream_error`. The request is refunded (`billed: false`).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "upstream_error": {
+                    "value": {
+                      "error": {
+                        "code": "upstream_error",
+                        "message": "Search is unavailable on our side right now. It’s not your plan or your quota.",
+                        "upstream_status": null
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 500,
+                        "used": 13,
+                        "remaining": 487,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stealer-export": {
+      "post": {
+        "operationId": "stealer_export",
+        "tags": [
+          "Export"
+        ],
+        "summary": "Stealer Export (.zip archive)",
+        "description": "Downloads **every stealer log attached to one System ID**, packed into a single `.zip` archive.\n\nUnlike every other endpoint, a success returns the **archive itself** (`application/zip`), not JSON. Errors still use the usual JSON envelope, so check the status code before reading the body.\n\n**Professional and Enterprise only.** One request per export, whatever the archive holds. The request is given back when the service fails, times out, finds nothing, or returns an archive over 32 MB.\n\nArchives are streamed straight through: Find.ly never stores their contents.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StealerExportRequest"
+              },
+              "examples": {
+                "request": {
+                  "value": {
+                    "system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The archive (billed). Binary `.zip`; `Content-Disposition` carries the suggested file name.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              },
+              "Content-Disposition": {
+                "$ref": "#/components/headers/ContentDisposition"
+              }
+            },
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request. `api_key_in_url`, `invalid_json`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`missing_api_key` or `invalid_api_key`.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "WWW-Authenticate": {
+                "$ref": "#/components/headers/WWWAuthenticate"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`plan_required` (no API access) or `module_locked` (the plan does not include Stealer Export). Not billed.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found` — no stealer logs are attached to this `system_id`. **The request is given back.**",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`body_too_large` — the body is over 16 KB.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid_input` — `system_id` is missing or is not a UUID. See `error.fields`. Never billed.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`quota_exceeded` (daily quota), `rate_limited` (20 requests in the last minute, or an export already running on this account), or `too_many_requests` (60 API calls in a minute from this IP). Never billed.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`internal_error`. No request was used.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`upstream_error` — the export service failed, timed out, or returned an archive over 32 MB. **The request is given back.**",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "`Authorization: Bearer fly_live_…`. Takes precedence when both headers are sent."
+      },
+      "apiKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "`X-API-Key: fly_live_…`. Used only when no `Authorization` header is sent."
+      }
+    },
+    "headers": {
+      "CacheControl": {
+        "description": "Always `no-store`.",
+        "schema": {
+          "type": "string",
+          "const": "no-store"
+        }
+      },
+      "XRequestBilled": {
+        "description": "`true` if this call used one request from the daily quota, otherwise `false`.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "true",
+            "false"
+          ]
+        }
+      },
+      "XQuotaLimit": {
+        "description": "Daily quota of the plan. Sent whenever the account quota is known (not on authentication or IP-limit errors).",
+        "schema": {
+          "type": "string",
+          "examples": [
+            "500"
+          ]
+        }
+      },
+      "XQuotaRemaining": {
+        "description": "Requests left today, after this call.",
+        "schema": {
+          "type": "string",
+          "examples": [
+            "487"
+          ]
+        }
+      },
+      "XQuotaReset": {
+        "description": "ISO 8601 time of the next reset (02:00 Europe/Paris).",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "RetryAfter": {
+        "description": "Seconds to wait before retrying (at least 1).",
+        "schema": {
+          "type": "string",
+          "examples": [
+            "3"
+          ]
+        }
+      },
+      "WWWAuthenticate": {
+        "description": "`Bearer realm=\"Find.ly API\"`, with `error=\"invalid_token\"` for `invalid_api_key`.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ContentDisposition": {
+        "description": "`attachment; filename=\"…\"`. The file name only contains `A-Z a-z 0-9 . _ -`.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "XResultsTotal": {
+        "description": "Selectors found, before the 5,000 cap.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "XResultsTruncated": {
+        "description": "`true` if the list was cut at 5,000 selectors.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "true",
+            "false"
+          ]
+        }
+      },
+      "XFileTruncated": {
+        "description": "`true` if the file is longer than what was delivered (8 MB cap).",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "true",
+            "false"
+          ]
+        }
+      },
+      "XFileTotalBytes": {
+        "description": "Size of the whole file in bytes, or `unknown` when the file was too large to measure (over 16 MB).",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "schemas": {
+      "Usage": {
+        "type": "object",
+        "description": "Quota of the account, after the call.",
+        "required": [
+          "plan",
+          "plan_expires_at",
+          "daily_quota",
+          "used",
+          "remaining",
+          "resets_at"
+        ],
+        "properties": {
+          "plan": {
+            "type": "string",
+            "enum": [
+              "Free",
+              "Starter",
+              "Professional",
+              "Enterprise"
+            ]
+          },
+          "plan_expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "End of the paid plan. `null` on Free."
+          },
+          "daily_quota": {
+            "type": "integer",
+            "description": "Requests per day: 500 on Professional, 1,500 on Enterprise."
+          },
+          "used": {
+            "type": "integer",
+            "description": "Requests used today, dashboard and API combined."
+          },
+          "remaining": {
+            "type": "integer",
+            "description": "Requests left today."
+          },
+          "resets_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Next reset, 02:00 Europe/Paris."
+          }
+        }
+      },
+      "ErrorCode": {
+        "type": "string",
+        "description": "Stable, machine-readable error code:\n\n- `api_key_in_url`: 400 — an API key was sent in the query string (`key`, `api_key`, `apikey`, `token` or `access_token`).\n- `invalid_json`: 400 — the body is missing, is not valid UTF-8 JSON, or is not a JSON object.\n- `unsupported_format`: 400 — `format` is not `json`, or `txt` was asked for a module that has no text output.\n- `missing_api_key`: 401 — neither `Authorization` nor `X-API-Key` was sent.\n- `invalid_api_key`: 401 — the key is malformed, unknown, regenerated, or belongs to a deleted account.\n- `account_suspended`: 403 — the account that owns the key is suspended.\n- `plan_required`: 403 — the account plan does not include API access (Professional and Enterprise only).\n- `module_locked`: 403 — the account plan does not include this module (Stealer Export needs Professional or Enterprise).\n- `unknown_module`: 404 — `{module}` is not one of the five search module slugs.\n- `not_a_search_module`: 400 — `stealer-export` was called as a search module. Use `POST /api/v1/stealer-export`.\n- `not_found`: 404 — no API endpoint at this path, or a Stealer Export whose System ID has no logs attached (the request is given back).\n- `body_too_large`: 413 — the request body is over 16 KB.\n- `invalid_input`: 422 — a field is unknown, has the wrong type, or has an invalid value. See `error.fields`.\n- `too_many_requests`: 429 — more than 60 API calls in one minute from the same IP address.\n- `quota_exceeded`: 429 — the account has used all of today's requests.\n- `rate_limited`: 429 — two searches already running, an export already running, or 20 requests in the last minute, on this account.\n- `internal_error`: 500 — unexpected server error. No request was used.\n- `upstream_error`: 502 — the search or export service failed, timed out, or sent an unreadable or oversized response (an archive over 32 MB). The request is refunded.",
+        "enum": [
+          "api_key_in_url",
+          "invalid_json",
+          "unsupported_format",
+          "missing_api_key",
+          "invalid_api_key",
+          "account_suspended",
+          "plan_required",
+          "module_locked",
+          "not_a_search_module",
+          "unknown_module",
+          "not_found",
+          "body_too_large",
+          "invalid_input",
+          "too_many_requests",
+          "quota_exceeded",
+          "rate_limited",
+          "internal_error",
+          "upstream_error"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "error",
+          "billed"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "$ref": "#/components/schemas/ErrorCode"
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable. It can change: branch on `code`, not on `message`."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "`invalid_input` only. One message per invalid or unknown field."
+              },
+              "plan": {
+                "type": "string",
+                "description": "`plan_required` only. The current plan."
+              },
+              "required_plan": {
+                "type": "string",
+                "description": "`module_locked` only. Cheapest plan that includes the module."
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "concurrent",
+                  "per-minute"
+                ],
+                "description": "`rate_limited` only. Which account limit was hit."
+              },
+              "upstream_status": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "`upstream_error` only. HTTP status returned by the search service when it sent one (400 or above), otherwise `null`."
+              }
+            }
+          },
+          "billed": {
+            "type": "boolean",
+            "description": "Errors are never billed."
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          }
+        }
+      },
+      "UsageResponse": {
+        "type": "object",
+        "required": [
+          "username",
+          "modules",
+          "billed",
+          "usage"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "Username of the account that owns the key."
+          },
+          "modules": {
+            "type": "array",
+            "description": "Module slugs open to this plan.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "intelligence-search",
+                "phonebook",
+                "identity-portal",
+                "system-id",
+                "storage-id"
+              ]
+            }
+          },
+          "billed": {
+            "type": "boolean",
+            "const": false
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          }
+        }
+      },
+      "IntelligenceSearchRequest": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Email, username, domain or text to search for. Trimmed; 200 characters max.",
+            "examples": [
+              "example.com"
+            ]
+          },
+          "max_results": {
+            "type": [
+              "integer",
+              "string",
+              "null"
+            ],
+            "description": "Whole number from 1 to 1000, as a JSON number or a string of digits. Omit for the default.",
+            "examples": [
+              100
+            ]
+          },
+          "media_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200,
+            "description": "Optional media type filter, passed as is. 200 characters max."
+          },
+          "sort_order": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "relevance",
+              "date_asc",
+              "date_desc",
+              null
+            ],
+            "description": "Case-insensitive."
+          },
+          "date_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "Start date, `YYYY-MM-DD`. Must be a real calendar date.",
+            "examples": [
+              "2024-01-01"
+            ]
+          },
+          "date_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "End date, `YYYY-MM-DD`. On or after `date_from`.",
+            "examples": [
+              "2024-12-31"
+            ]
+          }
+        }
+      },
+      "PhonebookRequest": {
+        "type": "object",
+        "required": [
+          "type",
+          "query"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "email",
+              "domain",
+              "url"
+            ],
+            "description": "What you want back: email addresses, domains (subdomains) or URLs. Case-insensitive."
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Its shape depends on `type`: `@example.com` for `email`, `example.com` for `domain`, `https://example.com` for `url` (http or https, a real domain name, no credentials). Sent lowercased.",
+            "examples": [
+              "@example.com"
+            ]
+          }
+        }
+      },
+      "IdentityPortalRequest": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Email address, domain or other selector. Trimmed; 200 characters max.",
+            "examples": [
+              "john.doe@example.com"
+            ]
+          }
+        }
+      },
+      "SystemIdRequest": {
+        "type": "object",
+        "required": [
+          "system_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "system_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the file, as returned in `results[].system_id`. Case-insensitive.",
+            "examples": [
+              "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"
+            ]
+          }
+        }
+      },
+      "StorageIdRequest": {
+        "type": "object",
+        "required": [
+          "storage_id",
+          "bucket"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "storage_id": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "128 or 129 hexadecimal characters. Whitespace and line breaks are removed first; 1,000 characters max as sent."
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "leaks.private.general",
+              "leaks.private",
+              "leaks.logs",
+              "leaks.public",
+              "documents.public",
+              "web.public",
+              "pastes",
+              "darknet",
+              "dns",
+              "whois",
+              "usenet",
+              "dumpster"
+            ],
+            "description": "Exact bucket value."
+          }
+        }
+      },
+      "Record": {
+        "type": "object",
+        "required": [
+          "name",
+          "date",
+          "date_raw",
+          "bucket",
+          "size_bytes",
+          "media_type",
+          "system_id",
+          "line",
+          "line_clipped"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the source (up to 2,000 characters)."
+          },
+          "date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Normalized ISO 8601 date, or `null` if unreadable."
+          },
+          "date_raw": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Date as received."
+          },
+          "bucket": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bucket of the source."
+          },
+          "size_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "media_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "system_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Lowercase UUID to download the raw file with System ID. `null` if missing or malformed."
+          },
+          "line": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Matching excerpt, up to 2,000 characters."
+          },
+          "line_clipped": {
+            "type": "boolean",
+            "description": "`true` if `line` was cut."
+          }
+        }
+      },
+      "Selector": {
+        "type": "object",
+        "required": [
+          "selector",
+          "date",
+          "date_raw"
+        ],
+        "properties": {
+          "selector": {
+            "type": "string",
+            "description": "Email, domain or URL (up to 500 characters)."
+          },
+          "date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "date_raw": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "File": {
+        "type": "object",
+        "required": [
+          "name",
+          "bytes",
+          "lines",
+          "truncated",
+          "total_bytes",
+          "text"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Suggested file name, `[A-Za-z0-9._-]` only."
+          },
+          "bytes": {
+            "type": "integer",
+            "description": "UTF-8 size of `text`."
+          },
+          "lines": {
+            "type": "integer",
+            "description": "Line count of `text`."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "`true` if `text` is only the beginning of the file (8 MB cap)."
+          },
+          "total_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Size of the whole file, or `null` if it was over 16 MB and could not be measured."
+          },
+          "text": {
+            "type": "string",
+            "description": "File content, decoded as UTF-8."
+          }
+        }
+      },
+      "ListMeta": {
+        "type": "object",
+        "required": [
+          "total",
+          "returned",
+          "truncated",
+          "billed",
+          "usage"
+        ],
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Results found."
+          },
+          "returned": {
+            "type": "integer",
+            "description": "Results in `results` (5,000 max)."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "`true` if `total` is greater than `returned`."
+          },
+          "billed": {
+            "type": "boolean"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          }
+        }
+      },
+      "RecordsResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ListMeta"
+          },
+          {
+            "type": "object",
+            "required": [
+              "module",
+              "query",
+              "results"
+            ],
+            "properties": {
+              "module": {
+                "type": "string",
+                "enum": [
+                  "intelligence-search",
+                  "identity-portal"
+                ]
+              },
+              "query": {
+                "type": "string",
+                "description": "The query as searched (trimmed)."
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Record"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "SelectorsResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ListMeta"
+          },
+          {
+            "type": "object",
+            "required": [
+              "module",
+              "query",
+              "type",
+              "results"
+            ],
+            "properties": {
+              "module": {
+                "type": "string",
+                "const": "phonebook"
+              },
+              "query": {
+                "type": "string",
+                "description": "The query as searched (trimmed, lowercased)."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "email",
+                  "domain",
+                  "url"
+                ]
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Selector"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "SystemIdResponse": {
+        "type": "object",
+        "required": [
+          "module",
+          "system_id",
+          "file",
+          "billed",
+          "usage"
+        ],
+        "properties": {
+          "module": {
+            "type": "string",
+            "const": "system-id"
+          },
+          "system_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "file": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/File"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`null` when the file is empty or was not found."
+          },
+          "billed": {
+            "type": "boolean"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          }
+        }
+      },
+      "StorageIdResponse": {
+        "type": "object",
+        "required": [
+          "module",
+          "storage_id",
+          "bucket",
+          "file",
+          "billed",
+          "usage"
+        ],
+        "properties": {
+          "module": {
+            "type": "string",
+            "const": "storage-id"
+          },
+          "storage_id": {
+            "type": "string"
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "leaks.private.general",
+              "leaks.private",
+              "leaks.logs",
+              "leaks.public",
+              "documents.public",
+              "web.public",
+              "pastes",
+              "darknet",
+              "dns",
+              "whois",
+              "usenet",
+              "dumpster"
+            ]
+          },
+          "file": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/File"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`null` when the file is empty or was not found."
+          },
+          "billed": {
+            "type": "boolean"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          }
+        }
+      },
+      "StealerExportRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "system_id"
+        ],
+        "properties": {
+          "system_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "System ID of the record, as shown under Expert Information on intelx.io. A UUID: 8-4-4-4-12 hexadecimal characters.",
+            "example": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,148 @@
+---
+title: "Quickstart"
+description: "Check your key, run a search and download a raw file with curl."
+---
+
+You need a Professional or Enterprise plan and your key from [Dashboard → API](https://findly.icu/dashboard/api). The examples use `fly_live_XXXX`: replace it with your key.
+
+<Steps>
+  <Step title="Store your key">
+    ```bash
+    export FINDLY_API_KEY="fly_live_XXXX"
+    ```
+  </Step>
+
+  <Step title="Check your plan and quota (free)">
+    ```bash
+    curl https://findly.icu/api/v1/usage \
+      -H "Authorization: Bearer $FINDLY_API_KEY"
+    ```
+
+    ```json
+    {
+      "username": "acme-security",
+      "modules": ["intelligence-search", "phonebook", "identity-portal", "system-id", "storage-id"],
+      "billed": false,
+      "usage": {
+        "plan": "Professional",
+        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+        "daily_quota": 500,
+        "used": 12,
+        "remaining": 488,
+        "resets_at": "2026-09-17T00:00:00.000Z"
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Run a search (1 request)">
+    ```bash
+    curl https://findly.icu/api/v1/search/intelligence-search \
+      -H "Authorization: Bearer $FINDLY_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"query": "example.com", "max_results": 100, "sort_order": "date_desc"}'
+    ```
+
+    ```json
+    {
+      "module": "intelligence-search",
+      "query": "example.com",
+      "total": 1,
+      "returned": 1,
+      "truncated": false,
+      "results": [
+        {
+          "name": "combolist_2024_part3.txt",
+          "date": "2024-03-18T09:41:07.000Z",
+          "date_raw": "2024-03-18 09:41:07",
+          "bucket": "leaks.private.general",
+          "size_bytes": 48213,
+          "media_type": "Text file",
+          "system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13",
+          "line": "john.doe@example.com:…",
+          "line_clipped": false
+        }
+      ],
+      "billed": true,
+      "usage": {
+        "plan": "Professional",
+        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+        "daily_quota": 500,
+        "used": 13,
+        "remaining": 487,
+        "resets_at": "2026-09-17T00:00:00.000Z"
+      }
+    }
+    ```
+
+    `billed: true` means this call used one request. `usage` is your quota after the call.
+  </Step>
+
+  <Step title="Download the raw file of a result (1 request)">
+    Pass a result's `system_id` to the System ID module. With `?format=txt` you get the file itself:
+
+    ```bash
+    curl "https://findly.icu/api/v1/search/system-id?format=txt" \
+      -H "Authorization: Bearer $FINDLY_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"}' \
+      -OJ
+    ```
+
+    `-OJ` saves it under the name from `Content-Disposition`. See [Raw files and text output](/guides/raw-files).
+  </Step>
+</Steps>
+
+## Handle errors
+
+Errors share one envelope and are never billed:
+
+```bash
+curl -i https://findly.icu/api/v1/search/phonebook \
+  -H "Authorization: Bearer $FINDLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "email", "query": "example.com"}'
+```
+
+```http
+HTTP/1.1 422 Unprocessable Entity
+Cache-Control: no-store
+X-Request-Billed: false
+
+{
+  "error": {
+    "code": "invalid_input",
+    "message": "Some fields are invalid. No request was used.",
+    "fields": { "query": "For emails, enter a domain starting with @ — for example @openai.com." }
+  },
+  "billed": false
+}
+```
+
+Branch on `error.code`, not on `message`. On `429`, wait for the number of seconds in `Retry-After`. The full list is in [Errors](/guides/errors).
+
+## Python
+
+```python
+import os
+import requests
+
+API = "https://findly.icu/api/v1"
+HEADERS = {"Authorization": f"Bearer {os.environ['FINDLY_API_KEY']}"}
+
+# Searches can take up to 30 seconds: keep the client timeout above that.
+response = requests.post(
+    f"{API}/search/phonebook",
+    headers=HEADERS,
+    json={"type": "domain", "query": "example.com"},
+    timeout=60,
+)
+body = response.json()
+
+if response.ok:
+    print(body["total"], "subdomains, billed:", body["billed"])
+    for item in body["results"]:
+        print(item["selector"])
+else:
+    print(response.status_code, body["error"]["code"], body["error"]["message"])
+```

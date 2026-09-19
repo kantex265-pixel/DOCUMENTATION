@@ -1,0 +1,64 @@
+---
+title: "Authentication"
+description: "Get your API key and send it in a header."
+---
+
+## Get your key
+
+Open [Dashboard → API](https://findly.icu/dashboard/api). Your key is created the first time you open the page, and you can copy it from there at any time.
+
+- Each account has **one** key. It looks like `fly_live_` followed by 32 letters and digits.
+- It acts as your account: same plan, same quota, same limits. Keep it private, like a password.
+- **Regenerate** (password required) creates a new key and deletes the current one right away. Any call still using the old key gets `401 invalid_api_key`.
+
+## Send the key
+
+Use either header. `Authorization` is recommended.
+
+<CodeGroup>
+
+```bash Authorization
+curl https://findly.icu/api/v1/usage \
+  -H "Authorization: Bearer fly_live_XXXX"
+```
+
+```bash X-API-Key
+curl https://findly.icu/api/v1/usage \
+  -H "X-API-Key: fly_live_XXXX"
+```
+
+</CodeGroup>
+
+If an `Authorization` header is present, it is the one that counts, even when `X-API-Key` is also sent. An `Authorization` header that is not `Bearer <key>` (for example `Basic …`, or `Bearer` with no key) is treated as an invalid key.
+
+<Warning>
+  Never put the key in the URL. A request with a `key`, `api_key`, `apikey`, `token` or `access_token` query parameter is refused with `400 api_key_in_url`, even if a valid header is also sent. URLs end up in logs and shell history: if that happened, regenerate your key.
+</Warning>
+
+## What is checked on every call
+
+The key is checked again on each call, so changes apply immediately:
+
+| Check | Error when it fails |
+| --- | --- |
+| Header present | `401 missing_api_key` |
+| Key known and account exists | `401 invalid_api_key` |
+| Account not suspended | `403 account_suspended` |
+| Plan includes API access (Professional or Enterprise) | `403 plan_required` |
+
+When a paid plan ends, the account falls back to Free and the key gets `403 plan_required` until you renew. Plans do not renew automatically. None of these refusals uses a request.
+
+`401` responses include a `WWW-Authenticate: Bearer realm="Find.ly API"` header.
+
+## Browsers
+
+The API does not send CORS headers, on purpose: a key must not live in the JavaScript of a web page. Call the API from your backend and keep the key in a server-side secret or environment variable.
+
+```bash
+export FINDLY_API_KEY="fly_live_XXXX"
+curl https://findly.icu/api/v1/usage -H "Authorization: Bearer $FINDLY_API_KEY"
+```
+
+## Test a key
+
+`GET /api/v1/usage` is never billed and never runs a search. A `200` response means the key works and the plan includes API access.

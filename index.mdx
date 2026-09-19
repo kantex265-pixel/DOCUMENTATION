@@ -1,0 +1,56 @@
+---
+title: "Introduction"
+description: "Run Find.ly searches and exports from your own code: the same modules, quota and limits as the dashboard."
+---
+
+The Find.ly API gives your scripts and servers the same searches as the [Find.ly dashboard](https://findly.icu/dashboard): leak records, selectors for a domain, raw files and stealer-log archives. It is a small JSON-over-HTTPS API with three endpoints.
+
+<Note>
+  API access comes with the **Professional** (500 requests a day) and **Enterprise** (1,500 requests a day) plans. See [pricing](https://findly.icu/#pricing).
+</Note>
+
+## Base URL
+
+```text
+https://findly.icu/api/v1
+```
+
+HTTPS only. Every response is sent with `Cache-Control: no-store`.
+
+## Endpoints
+
+| Method | Path | What it does | Billed |
+| --- | --- | --- | --- |
+| `GET` | `/api/v1/usage` | Plan, today's quota and open modules | Never |
+| `POST` | `/api/v1/search/{module}` | One search in one module | 1 request when served |
+| `POST` | `/api/v1/stealer-export` | Every stealer log of one System ID, as a `.zip` | 1 request per export |
+
+`{module}` is one of `intelligence-search`, `phonebook`, `identity-portal`, `system-id` or `storage-id`. See [Modules and inputs](/guides/modules).
+
+Stealer Export is **not** a search module: it answers with a file rather than JSON, and belongs to the **Professional** and **Enterprise** plans. See [Stealer Export](/guides/stealer-export).
+
+## How it works
+
+- **One account, one quota.** A key acts as your account. Searches made through the API and in the dashboard share the same daily quota and the same per-account limits.
+- **Every response tells you what it cost.** JSON responses carry `billed` and a `usage` object; JSON and text responses carry `X-Request-Billed`, and `X-Quota-*` headers whenever the quota is known.
+- **Errors are free.** Invalid input, refused calls and service failures never use a request. See [Billing and quotas](/guides/billing-and-quotas).
+- **Server-side only.** The API sends no CORS headers: browsers cannot read its responses. Call it from a server, a script or a terminal, never from a web page.
+- **Nothing is stored.** Search results are sent back to you and not kept, so there is no server-side pagination: you get the whole list (up to 5,000 items) at once. See [Pagination](/guides/pagination).
+
+<Columns cols={2}>
+  <Card title="Quickstart" icon="terminal" href="/quickstart">
+    Your first call in a minute, with curl.
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Get your key and send it the right way.
+  </Card>
+  <Card title="Modules and inputs" icon="layer-group" href="/guides/modules">
+    Request bodies and responses for each module.
+  </Card>
+  <Card title="Errors" icon="triangle-exclamation" href="/guides/errors">
+    Every error code, its status and what to do.
+  </Card>
+  <Card title="Stealer Export" icon="file-zipper" href="/guides/stealer-export">
+    Pull every stealer log of a System ID as one archive.
+  </Card>
+</Columns>

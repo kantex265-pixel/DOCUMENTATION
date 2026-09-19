@@ -1,0 +1,60 @@
+---
+title: "Rate limits"
+description: "Per-address and per-account limits, size limits and how to retry."
+---
+
+## Limits
+
+| Limit | Scope | Error | `Retry-After` |
+| --- | --- | --- | --- |
+| 60 calls per minute | IP address, all `/api/v1` endpoints, valid key or not | `429 too_many_requests` | Until a slot frees up |
+| 2 searches running at once | Account (dashboard and API together) | `429 rate_limited`, `reason: "concurrent"` | 3 seconds |
+| 20 searches per minute | Account (dashboard and API together) | `429 rate_limited`, `reason: "per-minute"` | Until a slot frees up |
+| 1 Stealer Export at a time | Account (dashboard and API together) | `429 rate_limited` | A few seconds |
+| 2 Stealer Exports at a time | Whole service, all accounts | `429 too_many_requests` | A few seconds |
+| Daily quota | Account | `429 quota_exceeded` | Until the 02:00 Paris reset |
+
+Minute limits use a sliding 60-second window. Refused calls are never billed and do not count toward the window that refused them.
+
+In order, a search is checked for: IP limit, key and plan, module, format, body, input validity, concurrency, per-minute limit, then quota. So an invalid body does not use a per-minute slot, but a valid search refused for quota does.
+
+## Retrying
+
+Every `429` sends `Retry-After` in whole seconds (at least 1). Wait that long, then retry once; do not retry in a tight loop.
+
+```python
+import time
+import requests
+
+def search(module, body, key, attempts=3):
+    for _ in range(attempts):
+        response = requests.post(
+            f"https://findly.icu/api/v1/search/{module}",
+            headers={"Authorization": f"Bearer {key}"},
+            json=body,
+            timeout=60,
+        )
+        if response.status_code != 429:
+            return response
+        code = response.json()["error"]["code"]
+        if code == "quota_exceeded":
+            return response  # Waiting until 02:00 Paris is rarely what you want.
+        time.sleep(int(response.headers.get("Retry-After", "5")))
+    return response
+```
+
+To run many searches, keep at most **two in flight** and stay under **20 per minute** per account. Remember that searches made in the dashboard at the same time count too.
+
+Exports count toward the same 20-per-minute window, but run **one at a time per account** — an archive can reach 32 MB, so a second one is refused rather than queued.
+
+## Size and time limits
+
+| Limit | Value | What happens |
+| --- | --- | --- |
+| Request body | 16 KB | `413 body_too_large` |
+| Items in one list response | 5,000 | The list is cut; `truncated: true`, `total` keeps the real count |
+| Raw file delivered | 8 MB | The text is cut; `file.truncated: true` |
+| Search response read by Find.ly | 16 MB | Lists: `502 upstream_error` (refunded). Files: `502 upstream_error` (refunded) when the size is known in advance, otherwise the first 8 MB with `total_bytes: null` |
+| Search duration | 30 seconds | `502 upstream_error` (refunded) |
+
+Set your HTTP client timeout above 30 seconds (60 is a good value), or a slow search may be billed on our side while your client has already given up.

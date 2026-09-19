@@ -1,0 +1,138 @@
+---
+title: "Raw files and text output"
+description: "Download the file behind a result, and get plain text with ?format=txt."
+---
+
+## Download a raw file
+
+Records from Intelligence Search and Identity Portal have a `system_id`. Pass it to the System ID module to get the file. Each download is a search and uses **1 request**.
+
+```bash
+curl https://findly.icu/api/v1/search/system-id \
+  -H "Authorization: Bearer fly_live_XXXX" \
+  -H "Content-Type: application/json" \
+  -d '{"system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"}'
+```
+
+```json
+{
+  "module": "system-id",
+  "system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13",
+  "file": {
+    "name": "uuid-3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13.txt",
+    "bytes": 54,
+    "lines": 2,
+    "truncated": false,
+    "total_bytes": 54,
+    "text": "john.doe@example.com:hunter2\njane@example.com:letmein\n"
+  },
+  "billed": true,
+  "usage": {
+    "plan": "Professional",
+    "plan_expires_at": "2026-10-16T12:00:00.000Z",
+    "daily_quota": 500,
+    "used": 14,
+    "remaining": 486,
+    "resets_at": "2026-09-17T00:00:00.000Z"
+  }
+}
+```
+
+If a record has `system_id: null`, it has no downloadable file.
+
+Storage ID works the same way with a `storage_id` and a `bucket`; its response has `storage_id` and `bucket` instead of `system_id`. See [Modules and inputs](/guides/modules#storage-id).
+
+### Large files
+
+- At most the first **8 MB** of a file are delivered. `file.truncated` is then `true` and `bytes` is the size delivered.
+- `total_bytes` is the size of the whole file, or `null` if the file was over 16 MB and could not be measured.
+- A file known to be over 16 MB before it is read is refused with `502 upstream_error`, refunded.
+- A file that is empty (or only whitespace) returns `file: null`. It is billed, except when the file was not found, which is refunded. Check `billed`.
+
+## `?format=txt`
+
+Add `?format=txt` to get plain text instead of JSON. It is the **same call and the same price**: nothing extra is billed.
+
+| Module | Text output |
+| --- | --- |
+| `phonebook` | One selector per line, no header |
+| `system-id` | The file |
+| `storage-id` | The file |
+| `intelligence-search`, `identity-portal` | Not available: `400 unsupported_format` |
+
+A text response is a `text/plain; charset=utf-8` attachment. The billing and quota headers are the same as for JSON, since there is no body to carry `billed`:
+
+<Tabs>
+  <Tab title="Phonebook">
+    ```http
+    HTTP/1.1 200 OK
+    Content-Type: text/plain; charset=utf-8
+    Content-Disposition: attachment; filename="phonebook-email-example.com.txt"
+    X-Request-Billed: true
+    X-Quota-Limit: 500
+    X-Quota-Remaining: 485
+    X-Quota-Reset: 2026-09-17T00:00:00.000Z
+    X-Results-Total: 2
+    X-Results-Truncated: false
+
+    john.doe@example.com
+    jane@example.com
+    ```
+
+    ```bash
+    curl "https://findly.icu/api/v1/search/phonebook?format=txt" \
+      -H "Authorization: Bearer fly_live_XXXX" \
+      -H "Content-Type: application/json" \
+      -d '{"type": "email", "query": "@example.com"}' \
+      -o emails.txt
+    ```
+  </Tab>
+  <Tab title="System ID / Storage ID">
+    ```http
+    HTTP/1.1 200 OK
+    Content-Type: text/plain; charset=utf-8
+    Content-Disposition: attachment; filename="uuid-3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13.txt"
+    X-Request-Billed: true
+    X-Quota-Limit: 500
+    X-Quota-Remaining: 484
+    X-Quota-Reset: 2026-09-17T00:00:00.000Z
+    X-File-Truncated: false
+    X-File-Total-Bytes: 54
+
+    john.doe@example.com:hunter2
+    jane@example.com:letmein
+    ```
+
+    ```bash
+    curl "https://findly.icu/api/v1/search/system-id?format=txt" \
+      -H "Authorization: Bearer fly_live_XXXX" \
+      -H "Content-Type: application/json" \
+      -d '{"system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"}' \
+      -OJ
+    ```
+
+    `X-File-Total-Bytes` is `unknown` when the file was over 16 MB.
+  </Tab>
+</Tabs>
+
+File names only contain `A-Z a-z 0-9 . _ -`, so `curl -OJ` is safe to use.
+
+### Empty results
+
+With `?format=txt`, an empty result returns **`204 No Content`** with no body. Read `X-Request-Billed` to know whether it was billed.
+
+### Errors stay JSON
+
+`?format=txt` only changes successful output. Errors are always the JSON envelope described in [Errors](/guides/errors). Check the status code before saving the body to a file:
+
+```bash
+status=$(curl -s -o emails.txt -w "%{http_code}" "https://findly.icu/api/v1/search/phonebook?format=txt" \
+  -H "Authorization: Bearer fly_live_XXXX" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "domain", "query": "example.com"}')
+[ "$status" = "200" ] || { echo "HTTP $status"; cat emails.txt; }
+```
+
+<Warning>
+  File content comes from leaked data. Treat it as untrusted text: never execute it or render it as HTML.
+</Warning>

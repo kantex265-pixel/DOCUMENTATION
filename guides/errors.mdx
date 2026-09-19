@@ -1,0 +1,87 @@
+---
+title: "Errors"
+description: "One error envelope, stable codes, and what to do for each."
+---
+
+## Envelope
+
+Every error has the same JSON shape:
+
+```json
+{
+  "error": {
+    "code": "rate_limited",
+    "message": "Too many searches in the last minute. Try again shortly.",
+    "reason": "per-minute"
+  },
+  "billed": false
+}
+```
+
+- `error.code` is **stable**: use it in your code.
+- `error.message` is written for humans and **can change**.
+- Some codes add fields next to `code` (see the table).
+- `billed` is always `false`: errors never use a request.
+- Some errors also carry `usage` and the `X-Quota-*` headers (see [Billing and quotas](/guides/billing-and-quotas)).
+
+## Error codes
+
+| Status | `code` | Extra fields | Cause | What to do |
+| --- | --- | --- | --- | --- |
+| 400 | `api_key_in_url` | | A `key`, `api_key`, `apikey`, `token` or `access_token` query parameter was sent | Send the key in a header. Regenerate it if it was logged |
+| 400 | `invalid_json` | | Empty body, invalid JSON or UTF-8, or not a JSON object | Send a JSON object |
+| 400 | `unsupported_format` | | `format` is not `json`, or `txt` on Intelligence Search or Identity Portal | Use `json`, or `txt` on Phonebook, System ID, Storage ID |
+| 401 | `missing_api_key` | | No `Authorization` or `X-API-Key` header | Add the header |
+| 401 | `invalid_api_key` | | Malformed, unknown or regenerated key | Copy the current key from the dashboard |
+| 403 | `account_suspended` | | The account is suspended | Contact support |
+| 403 | `plan_required` | `plan` | The plan has no API access (not Professional or Enterprise, or the plan ended) | Upgrade or renew |
+| 403 | `module_locked` | `required_plan` | The plan does not include this module | Upgrade to `required_plan` |
+| 404 | `unknown_module` | | `{module}` is not a module slug | Use one of the five slugs |
+| 404 | `not_found` | | No endpoint at this path, or a Stealer Export with no logs attached | Check the URL; for an export, the request was given back |
+| 400 | `not_a_search_module` | | `stealer-export` was called as a search module | Use `POST /api/v1/stealer-export` |
+| 413 | `body_too_large` | | Body over 16 KB | Send a smaller body |
+| 422 | `invalid_input` | `fields` | Unknown field, wrong type or invalid value | Fix the fields listed in `fields` |
+| 429 | `too_many_requests` | | Over 60 calls a minute from your IP address | Wait `Retry-After` seconds |
+| 429 | `quota_exceeded` | | No requests left today | Wait for the 02:00 Paris reset, or upgrade |
+| 429 | `rate_limited` | `reason` | `concurrent`: 2 searches already running. `per-minute`: 20 searches in the last minute | Wait `Retry-After` seconds |
+| 500 | `internal_error` | | Unexpected error on our side | Retry later |
+| 502 | `upstream_error` | `upstream_status` | The search service failed, timed out (30 s), or sent an unreadable or oversized response | Retry in a minute; narrow the search if it was too large |
+
+`upstream_status` is the HTTP status the search service returned when it returned one (400 or above), otherwise `null`. On `upstream_error`, `billed` is `false` because the request is refunded.
+
+## Field errors
+
+`invalid_input` lists one message per field. Unknown fields are listed too (up to 10), with the accepted field names:
+
+```json
+{
+  "error": {
+    "code": "invalid_input",
+    "message": "Some fields are invalid. No request was used.",
+    "fields": {
+      "systemId": "Unknown field for System ID. Accepted: system_id."
+    }
+  },
+  "billed": false
+}
+```
+
+## Order of checks
+
+A search is checked in this order, and the first failure is returned:
+
+1. IP rate limit (`too_many_requests`)
+2. Key in the URL (`api_key_in_url`)
+3. Key (`missing_api_key`, `invalid_api_key`), account (`account_suspended`), plan (`plan_required`)
+4. Module slug (`unknown_module`)
+5. `format` (`unsupported_format`)
+6. Body size and JSON (`body_too_large`, `invalid_json`)
+7. Fields (`invalid_input`)
+8. Account limits (`rate_limited`)
+9. Module in plan (`module_locked`), then daily quota (`quota_exceeded`)
+10. The search itself (`upstream_error`)
+
+## Other responses
+
+- A method the endpoint does not support (for example `GET /api/v1/search/phonebook` or `POST /api/v1/usage`) returns `405 Method Not Allowed` without the JSON envelope.
+- `204 No Content` is not an error: it is an empty result with `?format=txt`. See [Raw files and text output](/guides/raw-files).

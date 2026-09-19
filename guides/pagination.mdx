@@ -1,0 +1,58 @@
+---
+title: "Pagination"
+description: "The whole list comes back in one response. Page through it on your side."
+---
+
+Find.ly does not store search results, so there is no page 2 to fetch later. A search returns **the whole list in one response**, up to 5,000 items, and you page, sort and filter it on your side at no cost.
+
+<Warning>
+  There is no `page`, `offset` or `cursor` parameter. In the body, such a field returns `422 invalid_input`; in the URL, anything other than `format` is ignored. Running the same search again to get "the next page" uses another request and returns the same list.
+</Warning>
+
+## Read the counters
+
+| Field | Meaning |
+| --- | --- |
+| `total` | Results found |
+| `returned` | Items in `results` (5,000 max) |
+| `truncated` | `true` when `total` is greater than `returned` |
+
+When `truncated` is `true`, the items beyond 5,000 are not reachable. Narrow the search instead: for Intelligence Search, lower `max_results` or set `date_from` / `date_to`.
+
+## Page on your side
+
+<CodeGroup>
+
+```bash jq
+curl -s https://findly.icu/api/v1/search/intelligence-search \
+  -H "Authorization: Bearer fly_live_XXXX" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "example.com"}' > results.json
+
+# Page 3, 50 items per page
+jq '.results[100:150]' results.json
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://findly.icu/api/v1/search/intelligence-search",
+    headers={"Authorization": "Bearer fly_live_XXXX"},
+    json={"query": "example.com"},
+    timeout=60,
+)
+results = response.json()["results"]
+
+PAGE_SIZE = 50
+pages = [results[i:i + PAGE_SIZE] for i in range(0, len(results), PAGE_SIZE)]
+print(len(pages), "pages")
+```
+
+</CodeGroup>
+
+Keep the response if you need it again: another call is another billed search.
+
+## Export Phonebook as text
+
+Phonebook can return the list as plain text, one selector per line, with `?format=txt`. It is the same search at the same price, not an extra request. See [Raw files and text output](/guides/raw-files).

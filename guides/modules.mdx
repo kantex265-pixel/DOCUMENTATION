@@ -1,0 +1,193 @@
+---
+title: "Modules and inputs"
+description: "The five search modules, their request bodies and their responses — plus the export that returns a file."
+---
+
+Every search is a `POST` with a JSON object body:
+
+```text
+POST https://findly.icu/api/v1/search/{module}
+```
+
+| `{module}` | What it returns | Body fields | `?format=txt` |
+| --- | --- | --- | --- |
+| `intelligence-search` | Records matching free text | `query`, `max_results`, `media_type`, `sort_order`, `date_from`, `date_to` | No |
+| `phonebook` | Emails, subdomains or URLs for a domain | `type`, `query` | Yes: one selector per line |
+| `identity-portal` | Records for an email, domain or selector | `query` | No |
+| `system-id` | A raw file, by its System ID | `system_id` | Yes: the file |
+| `storage-id` | A raw file, by storage ID and bucket | `storage_id`, `bucket` | Yes: the file |
+
+Professional and Enterprise include all five search modules (and Stealer Export, below). An unknown slug returns `404 unknown_module`.
+
+<Note>
+  **Stealer Export is not a search module.** It returns a `.zip` archive instead of JSON, so it has its own
+  address — `POST /api/v1/stealer-export` — and its own page: [Stealer Export](/guides/stealer-export).
+  Calling `/api/v1/search/stealer-export` returns `400 not_a_search_module`.
+</Note>
+
+## Rules that apply to every body
+
+- The body must be a JSON object of **16 KB or less** (`400 invalid_json`, `413 body_too_large`). `Content-Type: application/json` is recommended but not required.
+- **Unknown fields are rejected** with `422 invalid_input`, so a typo such as `systemId` is reported instead of ignored.
+- Values are **strings**. `max_results` also accepts a JSON number. `null` counts as absent.
+- Leading and trailing spaces are trimmed. Text fields are limited to 200 characters.
+- Invalid input returns `422 invalid_input` with one message per field in `error.fields`, and is **never billed**.
+- `GET` is not supported: a search value in a URL would end up in logs.
+
+## Intelligence Search
+
+Free-text search by email, username, domain or keyword.
+
+<ParamField body="query" type="string" required>
+  Email, username, domain or text. 200 characters max.
+</ParamField>
+<ParamField body="max_results" type="number | string">
+  Whole number from 1 to 1000.
+</ParamField>
+<ParamField body="media_type" type="string">
+  Media type filter, passed as is. 200 characters max.
+</ParamField>
+<ParamField body="sort_order" type="string">
+  `relevance`, `date_asc` or `date_desc` (case-insensitive).
+</ParamField>
+<ParamField body="date_from" type="string">
+  Start date, `YYYY-MM-DD`. Must be a real calendar date.
+</ParamField>
+<ParamField body="date_to" type="string">
+  End date, `YYYY-MM-DD`, on or after `date_from`.
+</ParamField>
+
+```bash
+curl https://findly.icu/api/v1/search/intelligence-search \
+  -H "Authorization: Bearer fly_live_XXXX" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "example.com", "max_results": 200, "date_from": "2024-01-01", "date_to": "2024-12-31"}'
+```
+
+## Phonebook
+
+Every known selector for a domain. `type` decides both what you get back and the shape `query` must have.
+
+<ParamField body="type" type="string" required>
+  `email`, `domain` or `url` (case-insensitive).
+</ParamField>
+<ParamField body="query" type="string" required>
+  Depends on `type`. Sent lowercased.
+</ParamField>
+
+| `type` | You get | `query` must look like |
+| --- | --- | --- |
+| `email` | Email addresses at the domain | `@example.com` |
+| `domain` | Subdomains | `example.com` |
+| `url` | URLs | `https://example.com` (http or https, no credentials) |
+
+The domain must be a real domain name: IP addresses, `localhost` and non-ASCII names are refused.
+
+```bash
+curl https://findly.icu/api/v1/search/phonebook \
+  -H "Authorization: Bearer fly_live_XXXX" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "email", "query": "@example.com"}'
+```
+
+## Identity Portal
+
+<ParamField body="query" type="string" required>
+  Email address, domain or other selector. 200 characters max.
+</ParamField>
+
+```bash
+curl https://findly.icu/api/v1/search/identity-portal \
+  -H "Authorization: Bearer fly_live_XXXX" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "john.doe@example.com"}'
+```
+
+## System ID
+
+Downloads the raw file behind a result.
+
+<ParamField body="system_id" type="string" required>
+  UUID (`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`), usually `results[].system_id` from Intelligence Search or Identity Portal. Case-insensitive.
+</ParamField>
+
+## Storage ID
+
+Downloads a raw file by storage ID.
+
+<ParamField body="storage_id" type="string" required>
+  128 or 129 hexadecimal characters. Spaces and line breaks are removed, so a wrapped copy-paste works (1,000 characters max as sent).
+</ParamField>
+<ParamField body="bucket" type="string" required>
+  One of the exact values below.
+</ParamField>
+
+| `bucket` | | |
+| --- | --- | --- |
+| `leaks.private.general` | `leaks.private` | `leaks.logs` |
+| `leaks.public` | `documents.public` | `web.public` |
+| `pastes` | `darknet` | `dns` |
+| `whois` | `usenet` | `dumpster` |
+
+Both file modules are covered in [Raw files and text output](/guides/raw-files).
+
+## Responses
+
+Every successful JSON response has `module`, `billed` and `usage`.
+
+<Tabs>
+  <Tab title="Records">
+    Intelligence Search and Identity Portal.
+
+    <ResponseField name="query" type="string">The query as searched.</ResponseField>
+    <ResponseField name="total" type="number">Results found.</ResponseField>
+    <ResponseField name="returned" type="number">Results in `results`, 5,000 max.</ResponseField>
+    <ResponseField name="truncated" type="boolean">`true` if `total` is greater than `returned`.</ResponseField>
+    <ResponseField name="results" type="object[]">
+      <Expandable title="record">
+        <ResponseField name="name" type="string">Name of the source.</ResponseField>
+        <ResponseField name="date" type="string | null">ISO 8601 date, or `null` if unreadable.</ResponseField>
+        <ResponseField name="date_raw" type="string | null">Date as received.</ResponseField>
+        <ResponseField name="bucket" type="string | null">Bucket of the source.</ResponseField>
+        <ResponseField name="size_bytes" type="number | null">Size in bytes.</ResponseField>
+        <ResponseField name="media_type" type="string | null">Media type.</ResponseField>
+        <ResponseField name="system_id" type="string | null">Lowercase UUID for System ID. `null` if missing or malformed.</ResponseField>
+        <ResponseField name="line" type="string | null">Matching excerpt, up to 2,000 characters.</ResponseField>
+        <ResponseField name="line_clipped" type="boolean">`true` if `line` was cut.</ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Tab>
+  <Tab title="Selectors">
+    Phonebook. Same `query`, `total`, `returned` and `truncated`, plus `type`.
+
+    <ResponseField name="type" type="string">`email`, `domain` or `url`.</ResponseField>
+    <ResponseField name="results" type="object[]">
+      <Expandable title="selector">
+        <ResponseField name="selector" type="string">The email, domain or URL.</ResponseField>
+        <ResponseField name="date" type="string | null">ISO 8601 date, or `null`.</ResponseField>
+        <ResponseField name="date_raw" type="string | null">Date as received.</ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Tab>
+  <Tab title="File">
+    System ID (`system_id`) and Storage ID (`storage_id`, `bucket`).
+
+    <ResponseField name="file" type="object | null">
+      `null` when the file is empty or not found.
+      <Expandable title="file">
+        <ResponseField name="name" type="string">Suggested file name.</ResponseField>
+        <ResponseField name="bytes" type="number">UTF-8 size of `text`.</ResponseField>
+        <ResponseField name="lines" type="number">Lines in `text`.</ResponseField>
+        <ResponseField name="truncated" type="boolean">`true` if `text` is only the first 8 MB.</ResponseField>
+        <ResponseField name="total_bytes" type="number | null">Size of the whole file, `null` if over 16 MB.</ResponseField>
+        <ResponseField name="text" type="string">File content.</ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Tab>
+</Tabs>
+
+An empty result is a normal `200`: `total: 0` and `results: []` for lists, `file: null` for files. See [Billing and quotas](/guides/billing-and-quotas) for when it is billed.
+
+<Warning>
+  Results come from leaked and public data. Treat every string (`name`, `line`, `selector`, file text) as untrusted: escape it before displaying it in HTML and never execute it.
+</Warning>

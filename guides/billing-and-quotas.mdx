@@ -1,0 +1,94 @@
+---
+title: "Billing and quotas"
+description: "What uses a request, what is free, and how to read your quota from every response."
+---
+
+## Daily quota
+
+| Plan | API access | Requests per day | Modules |
+| --- | --- | --- | --- |
+| Free | No | 3 | System ID, Storage ID |
+| Starter | No | 100 | Intelligence Search, System ID, Storage ID |
+| **Professional** | **Yes** | **500** | All five, plus Stealer Export |
+| **Enterprise** | **Yes** | **1,500** | All five, plus Stealer Export |
+
+- The quota resets every day at **02:00 Europe/Paris** time. `usage.resets_at` gives the exact instant.
+- The quota belongs to the account: searches in the dashboard and through the API draw from the same pool.
+- Unused requests do not carry over.
+- Plans last for the period you bought and do not renew automatically. When a plan ends, the account is back on Free and the API answers `403 plan_required`.
+
+## What uses a request
+
+| Call | Cost |
+| --- | --- |
+| A served search (records, selectors or a file) | **1 request** |
+| A successful search that finds nothing | **1 request** |
+| The same search with `?format=txt` | **1 request** (same call, different output) |
+| Downloading a raw file (System ID or Storage ID) | **1 request** |
+| A Stealer Export archive | **1 request per export**, whatever it holds |
+| `GET /api/v1/usage` | Free |
+| Invalid input (`422`), bad JSON, wrong format | Free |
+| Authentication, plan, module, quota and rate-limit refusals | Free |
+| The search service fails, times out or sends an unreadable response (`502`) | Free (refunded) |
+| The search service reports that nothing exists for this input | Free (refunded) |
+| A Stealer Export that finds no logs, or an archive over 32 MB | Free (refunded) |
+| Server error (`500`) | Free |
+
+There is no charge for paging, filtering or exporting what you already received: it is all in the response. See [Pagination](/guides/pagination).
+
+## Know what a call cost
+
+Every JSON response has a `billed` boolean, and every response has an `X-Request-Billed: true|false` header. Rely on them instead of the status code: an empty result can be billed (`200`, `billed: true`) or refunded (`200`, `billed: false`).
+
+When the account quota is known, the response also carries it after the call:
+
+<CodeGroup>
+
+```json Body
+{
+  "billed": true,
+  "usage": {
+    "plan": "Professional",
+    "plan_expires_at": "2026-10-16T12:00:00.000Z",
+    "daily_quota": 500,
+    "used": 13,
+    "remaining": 487,
+    "resets_at": "2026-09-17T00:00:00.000Z"
+  }
+}
+```
+
+```http Headers
+X-Request-Billed: true
+X-Quota-Limit: 500
+X-Quota-Remaining: 487
+X-Quota-Reset: 2026-09-17T00:00:00.000Z
+```
+
+</CodeGroup>
+
+| Field | Meaning |
+| --- | --- |
+| `plan` | `Free`, `Starter`, `Professional` or `Enterprise` |
+| `plan_expires_at` | End of the paid plan, `null` on Free |
+| `daily_quota` | Requests per day for this plan |
+| `used` | Requests used today (dashboard and API) |
+| `remaining` | Requests left today |
+| `resets_at` | Next reset (02:00 Europe/Paris) |
+
+`usage` and `X-Quota-*` are present on `GET /api/v1/usage`, on served searches, and on `plan_required`, `module_locked`, `unknown_module`, `quota_exceeded` and `upstream_error`. They are absent on the other errors (authentication, `too_many_requests`, `rate_limited`, body and input errors, `internal_error`), which are returned before the account quota is read.
+
+## When the quota runs out
+
+```json
+{
+  "error": {
+    "code": "quota_exceeded",
+    "message": "You’ve used all of today’s requests. Your quota resets at 02:00 Paris time."
+  },
+  "billed": false,
+  "usage": { "plan": "Professional", "daily_quota": 500, "used": 500, "remaining": 0, "plan_expires_at": "2026-10-16T12:00:00.000Z", "resets_at": "2026-09-17T00:00:00.000Z" }
+}
+```
+
+The status is `429`, and `Retry-After` gives the seconds until the reset. Retrying earlier only returns the same error. Check `remaining` before a batch instead: `GET /api/v1/usage` is free.

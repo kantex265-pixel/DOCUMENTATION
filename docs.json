@@ -1,0 +1,92 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Find.ly API",
+  "description": "Search leak and OSINT data from your own code with the Find.ly API.",
+  "colors": {
+    "primary": "#0a84ff",
+    "light": "#409cff",
+    "dark": "#0a84ff"
+  },
+  "appearance": {
+    "default": "dark",
+    "strict": true
+  },
+  "background": {
+    "color": {
+      "light": "#ffffff",
+      "dark": "#000000"
+    }
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Website",
+        "href": "https://findly.icu"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get your API key",
+      "href": "https://findly.icu/dashboard/api"
+    }
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get started",
+        "pages": [
+          "index",
+          "authentication",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "guides/modules",
+          "guides/billing-and-quotas",
+          "guides/rate-limits",
+          "guides/errors",
+          "guides/pagination",
+          "guides/raw-files",
+          "guides/stealer-export"
+        ]
+      },
+      {
+        "group": "API reference",
+        "openapi": "openapi.json",
+        "pages": [
+          "GET /api/v1/usage",
+          "POST /api/v1/search/intelligence-search",
+          "POST /api/v1/search/phonebook",
+          "POST /api/v1/search/identity-portal",
+          "POST /api/v1/search/system-id",
+          "POST /api/v1/search/storage-id",
+          "POST /api/v1/stealer-export"
+        ]
+      }
+    ]
+  },
+  "api": {
+    "playground": {
+      "display": "simple"
+    },
+    "examples": {
+      "languages": [
+        "bash",
+        "python",
+        "javascript"
+      ],
+      "defaults": "required"
+    }
+  },
+  "styling": {
+    "codeblocks": "dark"
+  },
+  "footer": {
+    "socials": {
+      "website": "https://findly.icu"
+    }
+  }
+}
