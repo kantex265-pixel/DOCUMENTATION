@@ -17,6 +17,22 @@ description: "What uses a request, what is free, and how to read your quota from
 - Unused requests do not carry over.
 - Plans last for the period you bought and do not renew automatically. When a plan ends, the account is back on Free and the API answers `403 plan_required`.
 
+## Breach Search quota
+
+`breach-search` runs on our own index, so it has its **own daily bucket**, separate from the request quota above. Spending one does not touch the other.
+
+| Plan | Breach searches per day |
+| --- | --- |
+| Free | None (no access) |
+| Starter | 100 |
+| **Professional** | **800** |
+| **Enterprise** | **5,000** |
+
+- One served Breach Search costs **1** from this bucket; a search that finds nothing still costs 1, and a refunded failure costs nothing — the same rules as the request quota.
+- The bucket resets at **02:00 Europe/Paris**, and the dashboard and API draw from the same one.
+- A `breach-search` response's `usage` block reports **this** bucket, so its `daily_quota`, `used` and `remaining` differ from the other modules on the same key. When it runs out, the module answers `429 quota_exceeded` like any other quota.
+- API access follows the table above: only Professional and Enterprise hold API keys, so Starter's 100 is a dashboard bucket.
+
 ## What uses a request
 
 | Call | Cost |

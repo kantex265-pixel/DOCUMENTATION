@@ -16,8 +16,15 @@ POST https://findly.icu/api/v1/search/{module}
 | `identity-portal` | Records for an email, domain or selector | `query` | No |
 | `system-id` | A raw file, by its System ID | `system_id` | Yes: the file |
 | `storage-id` | A raw file, by storage ID and bucket | `storage_id`, `bucket` | Yes: the file |
+| `breach-search` | A person's records across our own breach index | `query`, `fields` | No |
 
-Professional and Enterprise include all five search modules (and Stealer Export, below). An unknown slug returns `404 unknown_module`.
+Professional and Enterprise include every search module (and Stealer Export, below). An unknown slug returns `404 unknown_module`.
+
+<Note>
+  **`breach-search` draws from a separate daily bucket**, not the request quota in the table above — see
+  [Billing and quotas](/guides/billing-and-quotas#breach-search-quota). Its `usage` block therefore reports the
+  breach bucket, so `daily_quota` differs from the other modules on the same key.
+</Note>
 
 <Note>
   **Stealer Export is not a search module.** It returns a `.zip` archive instead of JSON, so it has its own
@@ -131,6 +138,47 @@ Downloads a raw file by storage ID.
 
 Both file modules are covered in [Raw files and text output](/guides/raw-files).
 
+## Breach Search
+
+Records for one person across our own breach index. The base request is a **single free-text value** — no options — and that covers most searches. An **advanced** form lets you combine named fields when you need to narrow to one person.
+
+Send `query`, `fields`, or both. At least one is required.
+
+### Base search
+
+<ParamField body="query" type="string" required>
+  Anything that names a person — an email, a full name, a username, a phone number. 256 characters max, 3 minimum. An address is matched exactly; other text is matched across name, username, phone, company, city and more at once. Sensitive fields (IBAN, SIRET) are never searched.
+</ParamField>
+
+```bash
+curl https://findly.icu/api/v1/search/breach-search \
+  -H "Authorization: Bearer fly_live_XXXX" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "jane.doe@example.com"}'
+```
+
+### Advanced search
+
+<ParamField body="fields" type="object">
+  A map of `field: value`. Each entry is a **separate, required constraint** — the index ANDs them, so `city` + `last_name` + `first_name` narrows to the one person, where a free `query` only ranks a bag of terms. Combine it with `query` and that too must match.
+</ParamField>
+
+Accepted keys: `full_name`, `first_name`, `last_name`, `username`, `email`, `phone`, `company`, `city`, `region`. Each value is 2–256 characters. At most 10 fields per request. `iban` and `siret` are refused — they are never a search target, in any form.
+
+```bash
+curl https://findly.icu/api/v1/search/breach-search \
+  -H "Authorization: Bearer fly_live_XXXX" \
+  -H "Content-Type: application/json" \
+  -d '{"fields": {"city": "Paris", "last_name": "Dupont", "first_name": "Jean"}}'
+```
+
+An unknown or sensitive key returns `422 invalid_input` (as `fields.<key>`) and is never billed. A blank value is dropped; if nothing is left to search, the request is refused before it costs anything.
+
+<Note>
+  Breach Search uses a **separate daily bucket** (Starter 100, Professional 800, Enterprise 5000), independent of the
+  request quota. See [Billing and quotas](/guides/billing-and-quotas#breach-search-quota).
+</Note>
+
 ## Responses
 
 Every successful JSON response has `module`, `billed` and `usage`.
@@ -166,6 +214,40 @@ Every successful JSON response has `module`, `billed` and `usage`.
         <ResponseField name="selector" type="string">The email, domain or URL.</ResponseField>
         <ResponseField name="date" type="string | null">ISO 8601 date, or `null`.</ResponseField>
         <ResponseField name="date_raw" type="string | null">Date as received.</ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Tab>
+  <Tab title="Breach records">
+    Breach Search. One record per person found, each carrying the breach it came from.
+
+    <ResponseField name="query" type="string">The query as searched.</ResponseField>
+    <ResponseField name="total" type="number">Records found. Capped at 10,000 — see `total_is_lower_bound`.</ResponseField>
+    <ResponseField name="total_is_lower_bound" type="boolean">`true` when the index stopped counting at 10,000: `total` is then a floor, not an exact count (show `10,000+`).</ResponseField>
+    <ResponseField name="returned" type="number">Records in `results`.</ResponseField>
+    <ResponseField name="truncated" type="boolean">`true` when `total` is greater than `returned`. There is no next page to request.</ResponseField>
+    <ResponseField name="partial" type="boolean">`true` when the index ran out of time: the list is a start, not the whole answer. A partial **empty** result is refunded.</ResponseField>
+    <ResponseField name="sources" type="object">
+      Map of `breach_id` to the breach it names.
+      <Expandable title="source">
+        <ResponseField name="id" type="string">Breach identifier (the map key).</ResponseField>
+        <ResponseField name="name" type="string | null">Breach name.</ResponseField>
+        <ResponseField name="site" type="string | null">Site the breach relates to.</ResponseField>
+        <ResponseField name="description" type="string | null">Short description.</ResponseField>
+        <ResponseField name="date" type="string | null">Breach date, as the index gives it.</ResponseField>
+        <ResponseField name="date_kind" type="string | null">`disclosed` or `occurred` — what `date` means.</ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="results" type="object[]">
+      <Expandable title="record">
+        <ResponseField name="breach_id" type="string">Key into `sources`. Empty string when the index did not name it.</ResponseField>
+        <ResponseField name="breach_name" type="string | null">Breach name carried on the row itself.</ResponseField>
+        <ResponseField name="breach_date" type="string | null">Breach date carried on the row itself.</ResponseField>
+        <ResponseField name="record" type="object">
+          Free object of `field: value` strings. **Columns vary from one breach to the next** — read the keys you need and ignore the rest. Never contains a password, in clear or hashed.
+        </ResponseField>
+        <ResponseField name="masked_fields" type="string[]">
+          Keys in `record` returned partially (an IBAN as its last four characters). Without this list, `****0189` reads as the whole value.
+        </ResponseField>
       </Expandable>
     </ResponseField>
   </Tab>
