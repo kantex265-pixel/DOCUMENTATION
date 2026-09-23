@@ -36,7 +36,7 @@ Every error has the same JSON shape:
 | 403 | `account_suspended` | | The account is suspended | Contact support |
 | 403 | `plan_required` | `plan` | The plan has no API access (not Professional or Enterprise, or the plan ended) | Upgrade or renew |
 | 403 | `module_locked` | `required_plan` | The plan does not include this module | Upgrade to `required_plan` |
-| 404 | `unknown_module` | | `{module}` is not a module slug | Use one of the five slugs |
+| 404 | `unknown_module` | | `{module}` is not a module slug | Use a valid module slug |
 | 404 | `not_found` | | No endpoint at this path, or a Stealer Export with no logs attached | Check the URL; for an export, the request was given back |
 | 400 | `not_a_search_module` | | `stealer-export` was called as a search module | Use `POST /api/v1/stealer-export` |
 | 413 | `body_too_large` | | Body over 16 KB | Send a smaller body |

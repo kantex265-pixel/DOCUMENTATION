@@ -3,7 +3,7 @@
   "info": {
     "title": "Find.ly API",
     "version": "1.0.0",
-    "description": "Search leak and OSINT data from your own code with the same five modules, quota and limits as the Find.ly dashboard. API access comes with the Professional and Enterprise plans.\n\nEvery search is `POST /api/v1/search/{module}`, where `{module}` is one of `intelligence-search`, `phonebook`, `identity-portal`, `system-id`, `storage-id`. Each module has its own reference page below because each takes a different body."
+    "description": "Search leak and OSINT data from your own code with the same modules, quota and limits as the Find.ly dashboard. API access comes with the Professional and Enterprise plans.\n\nFind.ly serves its own modules. Most are powered by our search provider, Intelligence X — `intelligence-search`, `phonebook`, `identity-portal`, `system-id`, `storage-id` and the Stealer Export archive. `breach-search` is ours: it runs on a breach index Find.ly ingests and documents itself, on its own separate daily quota.\n\nEvery search is `POST /api/v1/search/{module}`. Each module has its own reference page below because each takes a different body."
   },
   "servers": [
     {
@@ -3081,6 +3081,118 @@
           }
         }
       }
+    },
+    "/api/v1/search/breach-search": {
+      "post": {
+        "operationId": "search_breach",
+        "tags": [
+          "Search"
+        ],
+        "summary": "Breach Search",
+        "description": "Find one person's records across Find.ly's own breach index. Send a free-text `query`, an advanced `fields` object (ANDed), or both. Draws from a separate daily bucket (Starter 100, Professional 800, Enterprise 5000), not the request quota.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BreachSearchRequest"
+              },
+              "examples": {
+                "base": {
+                  "summary": "Free query",
+                  "value": {
+                    "query": "jane.doe@example.com"
+                  }
+                },
+                "advanced": {
+                  "summary": "Advanced, combined fields",
+                  "value": {
+                    "fields": {
+                      "city": "Paris",
+                      "last_name": "Dupont",
+                      "first_name": "Jean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search served (billed from the breach bucket), including a successful empty result.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "X-Request-Billed": {
+                "$ref": "#/components/headers/XRequestBilled"
+              },
+              "X-Quota-Limit": {
+                "$ref": "#/components/headers/XQuotaLimit"
+              },
+              "X-Quota-Remaining": {
+                "$ref": "#/components/headers/XQuotaRemaining"
+              },
+              "X-Quota-Reset": {
+                "$ref": "#/components/headers/XQuotaReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BreachRecordsResponse"
+                },
+                "examples": {
+                  "results": {
+                    "value": {
+                      "module": "breach-search",
+                      "query": "jane.doe@example.com",
+                      "total": 1,
+                      "total_is_lower_bound": false,
+                      "returned": 1,
+                      "truncated": false,
+                      "partial": false,
+                      "sources": {
+                        "acme-2023": {
+                          "id": "acme-2023",
+                          "name": "Acme 2023",
+                          "site": "acme.example",
+                          "description": null,
+                          "date": "2023-05-01",
+                          "date_kind": "disclosed"
+                        }
+                      },
+                      "results": [
+                        {
+                          "breach_id": "acme-2023",
+                          "breach_name": "Acme 2023",
+                          "breach_date": "2023-05-01",
+                          "record": {
+                            "email": "jane.doe@example.com",
+                            "full_name": "Jane Doe",
+                            "city": "Paris"
+                          },
+                          "masked_fields": []
+                        }
+                      ],
+                      "billed": true,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 800,
+                        "used": 12,
+                        "remaining": 788,
+                        "resets_at": "2026-09-24T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3245,7 +3357,7 @@
       },
       "ErrorCode": {
         "type": "string",
-        "description": "Stable, machine-readable error code:\n\n- `api_key_in_url`: 400 — an API key was sent in the query string (`key`, `api_key`, `apikey`, `token` or `access_token`).\n- `invalid_json`: 400 — the body is missing, is not valid UTF-8 JSON, or is not a JSON object.\n- `unsupported_format`: 400 — `format` is not `json`, or `txt` was asked for a module that has no text output.\n- `missing_api_key`: 401 — neither `Authorization` nor `X-API-Key` was sent.\n- `invalid_api_key`: 401 — the key is malformed, unknown, regenerated, or belongs to a deleted account.\n- `account_suspended`: 403 — the account that owns the key is suspended.\n- `plan_required`: 403 — the account plan does not include API access (Professional and Enterprise only).\n- `module_locked`: 403 — the account plan does not include this module (Stealer Export needs Professional or Enterprise).\n- `unknown_module`: 404 — `{module}` is not one of the five search module slugs.\n- `not_a_search_module`: 400 — `stealer-export` was called as a search module. Use `POST /api/v1/stealer-export`.\n- `not_found`: 404 — no API endpoint at this path, or a Stealer Export whose System ID has no logs attached (the request is given back).\n- `body_too_large`: 413 — the request body is over 16 KB.\n- `invalid_input`: 422 — a field is unknown, has the wrong type, or has an invalid value. See `error.fields`.\n- `too_many_requests`: 429 — more than 60 API calls in one minute from the same IP address.\n- `quota_exceeded`: 429 — the account has used all of today's requests.\n- `rate_limited`: 429 — two searches already running, an export already running, or 20 requests in the last minute, on this account.\n- `internal_error`: 500 — unexpected server error. No request was used.\n- `upstream_error`: 502 — the search or export service failed, timed out, or sent an unreadable or oversized response (an archive over 32 MB). The request is refunded.",
+        "description": "Stable, machine-readable error code:\n\n- `api_key_in_url`: 400 — an API key was sent in the query string (`key`, `api_key`, `apikey`, `token` or `access_token`).\n- `invalid_json`: 400 — the body is missing, is not valid UTF-8 JSON, or is not a JSON object.\n- `unsupported_format`: 400 — `format` is not `json`, or `txt` was asked for a module that has no text output.\n- `missing_api_key`: 401 — neither `Authorization` nor `X-API-Key` was sent.\n- `invalid_api_key`: 401 — the key is malformed, unknown, regenerated, or belongs to a deleted account.\n- `account_suspended`: 403 — the account that owns the key is suspended.\n- `plan_required`: 403 — the account plan does not include API access (Professional and Enterprise only).\n- `module_locked`: 403 — the account plan does not include this module (Stealer Export needs Professional or Enterprise).\n- `unknown_module`: 404 — `{module}` is not a search module slug.\n- `not_a_search_module`: 400 — `stealer-export` was called as a search module. Use `POST /api/v1/stealer-export`.\n- `not_found`: 404 — no API endpoint at this path, or a Stealer Export whose System ID has no logs attached (the request is given back).\n- `body_too_large`: 413 — the request body is over 16 KB.\n- `invalid_input`: 422 — a field is unknown, has the wrong type, or has an invalid value. See `error.fields`.\n- `too_many_requests`: 429 — more than 60 API calls in one minute from the same IP address.\n- `quota_exceeded`: 429 — the account has used all of today's requests.\n- `rate_limited`: 429 — two searches already running, an export already running, or 20 requests in the last minute, on this account.\n- `internal_error`: 500 — unexpected server error. No request was used.\n- `upstream_error`: 502 — the search or export service failed, timed out, or sent an unreadable or oversized response (an archive over 32 MB). The request is refunded.",
         "enum": [
           "api_key_in_url",
           "invalid_json",
@@ -3877,6 +3989,236 @@
             "format": "uuid",
             "description": "System ID of the record, as shown under Expert Information on intelx.io. A UUID: 8-4-4-4-12 hexadecimal characters.",
             "example": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"
+          }
+        }
+      },
+      "BreachSearchRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Free-text `query`, advanced `fields`, or both — at least one is required. `query` searches every identity field at once; `fields` ANDs named fields to narrow to one person. IBAN and SIRET are never a search target.",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 256,
+            "description": "Anything that names a person — email, full name, username, phone. Trimmed; 3–256 characters.",
+            "examples": [
+              "jane.doe@example.com"
+            ]
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Advanced search: each entry is a separate, required constraint (ANDed). 2–256 characters each, at most 10 fields. An unknown or sensitive key returns 422.",
+            "properties": {
+              "full_name": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 256
+              },
+              "first_name": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 256
+              },
+              "last_name": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 256
+              },
+              "username": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 256
+              },
+              "email": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 256
+              },
+              "phone": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 256
+              },
+              "company": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 256
+              },
+              "city": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 256
+              },
+              "region": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 256
+              }
+            },
+            "examples": [
+              {
+                "city": "Paris",
+                "last_name": "Dupont",
+                "first_name": "Jean"
+              }
+            ]
+          }
+        }
+      },
+      "BreachSource": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Breach identifier (the map key)."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Breach name."
+          },
+          "site": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Site the breach relates to."
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Breach date, as the index gives it."
+          },
+          "date_kind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "disclosed",
+              "occurred",
+              null
+            ],
+            "description": "What `date` means."
+          }
+        }
+      },
+      "BreachRecord": {
+        "type": "object",
+        "required": [
+          "breach_id",
+          "record",
+          "masked_fields"
+        ],
+        "properties": {
+          "breach_id": {
+            "type": "string",
+            "description": "Key into `sources`. Empty string when the index did not name it."
+          },
+          "breach_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "breach_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "record": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Free object of field: value. Columns vary from one breach to the next. Never contains a password."
+          },
+          "masked_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Keys in `record` returned partially (an IBAN as its last four characters)."
+          }
+        }
+      },
+      "BreachRecordsResponse": {
+        "type": "object",
+        "required": [
+          "module",
+          "query",
+          "total",
+          "returned",
+          "truncated",
+          "sources",
+          "results",
+          "billed",
+          "usage"
+        ],
+        "properties": {
+          "module": {
+            "type": "string",
+            "enum": [
+              "breach-search"
+            ]
+          },
+          "query": {
+            "type": "string",
+            "description": "The search as run: the free value, or the advanced fields joined."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Records found. Capped at 10,000 — see total_is_lower_bound."
+          },
+          "total_is_lower_bound": {
+            "type": "boolean",
+            "description": "`true` when the index stopped counting at 10,000."
+          },
+          "returned": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "`true` when total is greater than returned. There is no next page."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "`true` when the index ran out of time; an empty partial result is refunded."
+          },
+          "sources": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/BreachSource"
+            },
+            "description": "Map of breach_id to the breach it names."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BreachRecord"
+            }
+          },
+          "billed": {
+            "type": "boolean"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
           }
         }
       }

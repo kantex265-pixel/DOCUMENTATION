@@ -1,7 +1,9 @@
 ---
 title: "Modules and inputs"
-description: "The five search modules, their request bodies and their responses — plus the export that returns a file."
+description: "Find.ly's search modules — those powered by Intelligence X, plus Breach Search on our own index — their request bodies and responses, plus the export that returns a file."
 ---
+
+Find.ly serves its own modules. Most are powered by our search provider, **Intelligence X** (the `intelligence-search`, `phonebook`, `identity-portal`, `system-id` and `storage-id` modules, plus Stealer Export); **`breach-search` is ours** — it runs on a breach index Find.ly ingests and documents itself, on its own separate quota.
 
 Every search is a `POST` with a JSON object body:
 

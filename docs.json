@@ -58,12 +58,23 @@
         "openapi": "openapi.json",
         "pages": [
           "GET /api/v1/usage",
-          "POST /api/v1/search/intelligence-search",
-          "POST /api/v1/search/phonebook",
-          "POST /api/v1/search/identity-portal",
-          "POST /api/v1/search/system-id",
-          "POST /api/v1/search/storage-id",
-          "POST /api/v1/stealer-export"
+          {
+            "group": "IntelX Modules",
+            "pages": [
+              "POST /api/v1/search/intelligence-search",
+              "POST /api/v1/search/phonebook",
+              "POST /api/v1/search/identity-portal",
+              "POST /api/v1/search/system-id",
+              "POST /api/v1/search/storage-id",
+              "POST /api/v1/stealer-export"
+            ]
+          },
+          {
+            "group": "FindLy Module",
+            "pages": [
+              "POST /api/v1/search/breach-search"
+            ]
+          }
         ]
       }
     ]
