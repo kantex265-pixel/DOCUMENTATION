@@ -91,9 +91,11 @@ The docs describe what the code does. When one of these changes, update the docs
 | `lib/intelx/validate.ts`, `lib/intelx/catalog.ts` (input rules, buckets) | `guides/modules.mdx`, `openapi.json` |
 | `lib/search.ts` (billing, refunds, per-account limits) | `guides/billing-and-quotas.mdx`, `guides/rate-limits.mdx` |
 | `lib/plan-rules.ts`, `lib/site.ts` (quotas, modules, `apiAccess`) | `index.mdx`, `guides/billing-and-quotas.mdx` |
+| `lib/breachdb/*` (Breach Search input, advanced fields, limits) | `guides/modules.mdx` (FindLy Module), `guides/rate-limits.mdx`, `guides/pagination.mdx`, `openapi.json` |
+| `app/api/v1/usage/route.ts` (`usage`, `breach_usage`) | `authentication.mdx`, `quickstart.mdx`, `guides/billing-and-quotas.mdx`, `openapi.json` |
 
 Notes:
 
-- The API reference has one page per module (`/api/v1/search/intelligence-search`, …) rather than a single `{module}` page, because each module takes a different body and returns a different shape. All five are the same route in the code.
+- The API reference has one page per module (`/api/v1/search/intelligence-search`, …) rather than a single `{module}` page, because each module takes a different body and returns a different shape. They are grouped as **IntelX Modules** (the five IntelX searches, plus Stealer Export) and **FindLy Module** (Breach Search). All six search pages are the same route in the code.
 - The interactive playground is off (`"api.playground.display": "simple"`): it would send real keys through Mintlify's proxy and use real requests. Set it to `"interactive"` in `docs.json` if you want it.
 - No logo is set, so Mintlify shows the name "Find.ly API". To add one, put SVG or PNG files in `docs/logo/` and add `"logo": { "light": "/logo/light.svg", "dark": "/logo/dark.svg", "href": "https://findly.icu" }` and `"favicon": "/favicon.svg"` to `docs.json`.

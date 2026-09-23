@@ -3,7 +3,7 @@ title: "Pagination"
 description: "The whole list comes back in one response. Page through it on your side."
 ---
 
-Find.ly does not store search results, so there is no page 2 to fetch later. A search returns **the whole list in one response**, up to 5,000 items, and you page, sort and filter it on your side at no cost.
+Find.ly does not store search results, so there is no page 2 to fetch later. A search returns **the whole list in one response** — up to 5,000 items from an IntelX module, up to 100 records from Breach Search — and you page, sort and filter it on your side at no cost.
 
 <Warning>
   There is no `page`, `offset` or `cursor` parameter. In the body, such a field returns `422 invalid_input`; in the URL, anything other than `format` is ignored. Running the same search again to get "the next page" uses another request and returns the same list.
@@ -14,10 +14,14 @@ Find.ly does not store search results, so there is no page 2 to fetch later. A s
 | Field | Meaning |
 | --- | --- |
 | `total` | Results found |
-| `returned` | Items in `results` (5,000 max) |
+| `returned` | Items in `results` (5,000 max for IntelX modules, 100 for Breach Search) |
 | `truncated` | `true` when `total` is greater than `returned` |
+| `total_is_lower_bound` | Breach Search only: `true` when the index stopped counting at 10,000, so `total` is a floor |
 
-When `truncated` is `true`, the items beyond 5,000 are not reachable. Narrow the search instead: for Intelligence Search, lower `max_results` or set `date_from` / `date_to`.
+When `truncated` is `true`, the items beyond the cap are not reachable. Narrow the search instead:
+
+- **Intelligence Search**: lower `max_results` or set `date_from` / `date_to`.
+- **Breach Search**: replace the free `query` with combined `fields` (for example `last_name` + `first_name` + `city`) — every field must match, so the list shrinks to the person you want. See [Breach Search](/guides/modules#breach-search).
 
 ## Page on your side
 

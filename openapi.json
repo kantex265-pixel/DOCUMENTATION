@@ -41,10 +41,10 @@
           "Account"
         ],
         "summary": "Get usage",
-        "description": "Returns the plan, today's quota and the modules open to the account that owns the key. Never billed and never runs a search: use it to check that a key works.",
+        "description": "Returns the plan, both of today's quotas (`usage` for IntelX requests, `breach_usage` for Breach Search) and the modules open to the account that owns the key. Never billed and never runs a search: use it to check that a key works.",
         "responses": {
           "200": {
-            "description": "Plan, quota and modules. `billed` is always `false`.",
+            "description": "Plan, both quotas and modules. `billed` is always `false`. The `X-Quota-*` headers describe the IntelX quota.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -76,8 +76,18 @@
                         "phonebook",
                         "identity-portal",
                         "system-id",
-                        "storage-id"
+                        "storage-id",
+                        "breach-search",
+                        "stealer-export"
                       ],
+                      "breach_usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 800,
+                        "used": 3,
+                        "remaining": 797,
+                        "resets_at": "2026-09-17T00:00:00.000Z"
+                      },
                       "billed": false,
                       "usage": {
                         "plan": "Professional",
@@ -631,7 +641,7 @@
             }
           },
           "429": {
-            "description": "`too_many_requests` (per IP), `quota_exceeded` (daily quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent` or `per-minute`). Always sends `Retry-After`.",
+            "description": "`too_many_requests` (per IP, or service limit with `reason` `server-busy` / `service-paused`), `quota_exceeded` (daily IntelX quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent`, `per-minute` or `refund-cap`). Always sends `Retry-After`.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -1173,7 +1183,7 @@
             }
           },
           "429": {
-            "description": "`too_many_requests` (per IP), `quota_exceeded` (daily quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent` or `per-minute`). Always sends `Retry-After`.",
+            "description": "`too_many_requests` (per IP, or service limit with `reason` `server-busy` / `service-paused`), `quota_exceeded` (daily IntelX quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent`, `per-minute` or `refund-cap`). Always sends `Retry-After`.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -1673,7 +1683,7 @@
             }
           },
           "429": {
-            "description": "`too_many_requests` (per IP), `quota_exceeded` (daily quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent` or `per-minute`). Always sends `Retry-After`.",
+            "description": "`too_many_requests` (per IP, or service limit with `reason` `server-busy` / `service-paused`), `quota_exceeded` (daily IntelX quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent`, `per-minute` or `refund-cap`). Always sends `Retry-After`.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -2184,7 +2194,7 @@
             }
           },
           "429": {
-            "description": "`too_many_requests` (per IP), `quota_exceeded` (daily quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent` or `per-minute`). Always sends `Retry-After`.",
+            "description": "`too_many_requests` (per IP, or service limit with `reason` `server-busy` / `service-paused`), `quota_exceeded` (daily IntelX quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent`, `per-minute` or `refund-cap`). Always sends `Retry-After`.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -2698,7 +2708,7 @@
             }
           },
           "429": {
-            "description": "`too_many_requests` (per IP), `quota_exceeded` (daily quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent` or `per-minute`). Always sends `Retry-After`.",
+            "description": "`too_many_requests` (per IP, or service limit with `reason` `server-busy` / `service-paused`), `quota_exceeded` (daily IntelX quota; carries `usage`), `rate_limited` (per account; `reason` is `concurrent`, `per-minute` or `refund-cap`). Always sends `Retry-After`.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -3089,7 +3099,22 @@
           "Search"
         ],
         "summary": "Breach Search",
-        "description": "Find one person's records across Find.ly's own breach index. Send a free-text `query`, an advanced `fields` object (ANDed), or both. Draws from a separate daily bucket (Starter 100, Professional 800, Enterprise 5000), not the request quota.",
+        "description": "FindLy Module. Find one person's records across Find.ly's own breach index. Send a free-text `query` (the base request), an advanced `fields` object (every field must match), or both. Returns up to 100 records. Draws from its own daily Breach Search bucket (Professional 800, Enterprise 5,000), never from the IntelX request quota.",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "Only `json` (the default) is accepted. `txt` returns `400 unsupported_format`.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json"
+              ],
+              "default": "json"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -3190,6 +3215,129 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad request. `api_key_in_url`, `unsupported_format` (`?format=txt`), `invalid_json`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`missing_api_key` or `invalid_api_key`.",
+            "headers": {
+              "WWW-Authenticate": {
+                "$ref": "#/components/headers/WWWAuthenticate"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`account_suspended`, `plan_required` (no API access) or `module_locked` (the plan has no Breach Search bucket).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`body_too_large`: body over 16 KB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid_input`. Neither `query` nor `fields`, a value too short or over 256 characters, or an unknown or sensitive advanced field (reported as `fields.<name>`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unknown_field": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_input",
+                        "message": "Some fields are invalid. No request was used.",
+                        "fields": {
+                          "fields.iban": "Unknown field. Accepted: full_name, first_name, last_name, username, email, phone, company, city, region."
+                        }
+                      },
+                      "billed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`quota_exceeded` (Breach Search bucket empty; carries `usage` for that bucket — IntelX modules keep working), `rate_limited` (`concurrent` or `per-minute`, shared with IntelX searches), `too_many_requests` (per IP, or `server-busy` / `service-paused` for the breach index). Always sends `Retry-After`. No refund cap on Breach Search.",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "quota_exceeded": {
+                    "value": {
+                      "error": {
+                        "code": "quota_exceeded",
+                        "message": "You’ve used all of today’s requests. Your quota resets at 02:00 Paris time."
+                      },
+                      "billed": false,
+                      "usage": {
+                        "plan": "Professional",
+                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+                        "daily_quota": 800,
+                        "used": 800,
+                        "remaining": 0,
+                        "resets_at": "2026-09-24T00:00:00.000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`internal_error`. No request was used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`upstream_error`: the breach index failed, took over 20 s, sent an unreadable response or one over 4 MB, or ran out of time before finding anything (`partial` with no records). The request is refunded (`billed: false`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -3228,7 +3376,7 @@
         }
       },
       "XQuotaLimit": {
-        "description": "Daily quota of the plan. Sent whenever the account quota is known (not on authentication or IP-limit errors).",
+        "description": "Daily quota the call drew from (IntelX requests, or Breach Search on `breach-search`). Sent whenever the quota is known (not on authentication or IP-limit errors).",
         "schema": {
           "type": "string",
           "examples": [
@@ -3309,7 +3457,7 @@
     "schemas": {
       "Usage": {
         "type": "object",
-        "description": "Quota of the account, after the call.",
+        "description": "The quota the call drew from, after the call: IntelX requests for the IntelX modules and Stealer Export, the Breach Search bucket for `breach-search`.",
         "required": [
           "plan",
           "plan_expires_at",
@@ -3338,7 +3486,7 @@
           },
           "daily_quota": {
             "type": "integer",
-            "description": "Requests per day: 500 on Professional, 1,500 on Enterprise."
+            "description": "Requests per day in this quota. IntelX requests: 500 on Professional, 1,500 on Enterprise. Breach Search: 800 on Professional, 5,000 on Enterprise."
           },
           "used": {
             "type": "integer",
@@ -3357,7 +3505,7 @@
       },
       "ErrorCode": {
         "type": "string",
-        "description": "Stable, machine-readable error code:\n\n- `api_key_in_url`: 400 — an API key was sent in the query string (`key`, `api_key`, `apikey`, `token` or `access_token`).\n- `invalid_json`: 400 — the body is missing, is not valid UTF-8 JSON, or is not a JSON object.\n- `unsupported_format`: 400 — `format` is not `json`, or `txt` was asked for a module that has no text output.\n- `missing_api_key`: 401 — neither `Authorization` nor `X-API-Key` was sent.\n- `invalid_api_key`: 401 — the key is malformed, unknown, regenerated, or belongs to a deleted account.\n- `account_suspended`: 403 — the account that owns the key is suspended.\n- `plan_required`: 403 — the account plan does not include API access (Professional and Enterprise only).\n- `module_locked`: 403 — the account plan does not include this module (Stealer Export needs Professional or Enterprise).\n- `unknown_module`: 404 — `{module}` is not a search module slug.\n- `not_a_search_module`: 400 — `stealer-export` was called as a search module. Use `POST /api/v1/stealer-export`.\n- `not_found`: 404 — no API endpoint at this path, or a Stealer Export whose System ID has no logs attached (the request is given back).\n- `body_too_large`: 413 — the request body is over 16 KB.\n- `invalid_input`: 422 — a field is unknown, has the wrong type, or has an invalid value. See `error.fields`.\n- `too_many_requests`: 429 — more than 60 API calls in one minute from the same IP address.\n- `quota_exceeded`: 429 — the account has used all of today's requests.\n- `rate_limited`: 429 — two searches already running, an export already running, or 20 requests in the last minute, on this account.\n- `internal_error`: 500 — unexpected server error. No request was used.\n- `upstream_error`: 502 — the search or export service failed, timed out, or sent an unreadable or oversized response (an archive over 32 MB). The request is refunded.",
+        "description": "Stable, machine-readable error code:\n\n- `api_key_in_url`: 400 — an API key was sent in the query string (`key`, `api_key`, `apikey`, `token` or `access_token`).\n- `invalid_json`: 400 — the body is missing, is not valid UTF-8 JSON, or is not a JSON object.\n- `unsupported_format`: 400 — `format` is not `json`, or `txt` was asked for a module that has no text output (Intelligence Search, Identity Portal, Breach Search).\n- `missing_api_key`: 401 — neither `Authorization` nor `X-API-Key` was sent.\n- `invalid_api_key`: 401 — the key is malformed, unknown, regenerated, or belongs to a deleted account.\n- `account_suspended`: 403 — the account that owns the key is suspended.\n- `plan_required`: 403 — the account plan does not include API access (Professional and Enterprise only).\n- `module_locked`: 403 — the account plan does not include this module (Stealer Export needs Professional or Enterprise).\n- `unknown_module`: 404 — `{module}` is not a search module slug.\n- `not_a_search_module`: 400 — `stealer-export` was called as a search module. Use `POST /api/v1/stealer-export`.\n- `not_found`: 404 — no API endpoint at this path, or a Stealer Export whose System ID has no logs attached (the request is given back).\n- `body_too_large`: 413 — the request body is over 16 KB.\n- `invalid_input`: 422 — a field is unknown, has the wrong type, or has an invalid value. See `error.fields` (Breach Search advanced fields are keyed `fields.<name>`).\n- `too_many_requests`: 429 — more than 60 API calls in one minute from the same IP address (no `reason`), or a limit of the whole service: `reason` is `server-busy` (Find.ly already runs as many searches as it can: 3 IntelX, 6 Breach Search) or `service-paused` (the search service refused or was saturated a moment ago).\n- `quota_exceeded`: 429 — no requests left today in the quota this call draws from (IntelX requests, or the Breach Search bucket). Carries `usage` for that quota.\n- `rate_limited`: 429 — a limit of this account: `reason` is `concurrent` (two searches or an export already running), `per-minute` (20 in the last minute) or `refund-cap` (too many IntelX requests given back today; carries `usage`).\n- `internal_error`: 500 — unexpected server error. No request was used.\n- `upstream_error`: 502 — the search or export service (Intelligence X, or Find.ly's breach index for Breach Search) failed, timed out (30 s IntelX, 20 s Breach Search), or sent an unreadable or oversized response (an archive over 32 MB). The request is refunded.",
         "enum": [
           "api_key_in_url",
           "invalid_json",
@@ -3419,9 +3567,12 @@
                 "type": "string",
                 "enum": [
                   "concurrent",
-                  "per-minute"
+                  "per-minute",
+                  "refund-cap",
+                  "server-busy",
+                  "service-paused"
                 ],
-                "description": "`rate_limited` only. Which account limit was hit."
+                "description": "`rate_limited`: which account limit was hit (`concurrent`, `per-minute`, `refund-cap`). `too_many_requests`: which service limit was hit (`server-busy`, `service-paused`); absent for the per-IP limit."
               },
               "upstream_status": {
                 "type": [
@@ -3446,6 +3597,7 @@
         "required": [
           "username",
           "modules",
+          "breach_usage",
           "billed",
           "usage"
         ],
@@ -3456,7 +3608,7 @@
           },
           "modules": {
             "type": "array",
-            "description": "Module slugs open to this plan.",
+            "description": "Module slugs open to this plan: the IntelX modules, `breach-search` and `stealer-export`.",
             "items": {
               "type": "string",
               "enum": [
@@ -3464,16 +3616,23 @@
                 "phonebook",
                 "identity-portal",
                 "system-id",
-                "storage-id"
+                "storage-id",
+                "breach-search",
+                "stealer-export"
               ]
             }
+          },
+          "breach_usage": {
+            "$ref": "#/components/schemas/Usage",
+            "description": "Today's Breach Search bucket (800 a day on Professional, 5,000 on Enterprise), in the same shape as `usage`."
           },
           "billed": {
             "type": "boolean",
             "const": false
           },
           "usage": {
-            "$ref": "#/components/schemas/Usage"
+            "$ref": "#/components/schemas/Usage",
+            "description": "Today's IntelX request quota."
           }
         }
       },
@@ -4191,11 +4350,12 @@
             "description": "`true` when the index stopped counting at 10,000."
           },
           "returned": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Records in `results` (100 max)."
           },
           "truncated": {
             "type": "boolean",
-            "description": "`true` when total is greater than returned. There is no next page."
+            "description": "`true` when total is greater than returned. There is no next page: narrow the search with more `fields` instead."
           },
           "partial": {
             "type": "boolean",
@@ -4218,7 +4378,8 @@
             "type": "boolean"
           },
           "usage": {
-            "$ref": "#/components/schemas/Usage"
+            "$ref": "#/components/schemas/Usage",
+            "description": "The Breach Search bucket, after the call."
           }
         }
       }

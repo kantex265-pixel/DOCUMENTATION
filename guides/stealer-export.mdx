@@ -3,7 +3,7 @@ title: "Stealer Export"
 description: "Download every stealer log attached to one System ID, as a single .zip archive."
 ---
 
-Stealer Export takes one `system_id` and returns **every stealer log attached to it**, packed into a single `.zip` archive.
+Stealer Export takes one `system_id` and returns **every stealer log attached to it**, packed into a single `.zip` archive. It is part of the **IntelX Modules**: the logs come from our search provider, Intelligence X, and each export draws from your IntelX request quota.
 
 ```text
 POST https://findly.icu/api/v1/stealer-export
@@ -29,7 +29,7 @@ Nothing else. Unknown fields are rejected with `422 invalid_input`, so a typo su
 | | |
 | --- | --- |
 | Plans | **Professional and Enterprise** |
-| Cost | **1 request per export**, whatever the archive holds |
+| Cost | **1 IntelX request per export**, whatever the archive holds (never from the Breach Search bucket) |
 | Given back | service failure, timeout, no logs found, archive over 32 MB |
 | Concurrency | one export at a time per account |
 
@@ -124,7 +124,7 @@ On failure you get JSON:
 | 404 | `not_found` | Valid System ID, but no stealer logs attached | No — given back |
 | 422 | `invalid_input` | `system_id` missing or not a UUID | No |
 | 429 | `rate_limited` | An export is already running, or 20 requests in the last minute | No |
-| 429 | `quota_exceeded` | Daily quota reached | No |
+| 429 | `quota_exceeded` | Daily IntelX request quota reached | No |
 | 502 | `upstream_error` | Service failed, timed out, or archive over 32 MB | No — given back |
 
 <Warning>

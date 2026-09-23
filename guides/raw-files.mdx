@@ -58,7 +58,9 @@ Add `?format=txt` to get plain text instead of JSON. It is the **same call and t
 | `phonebook` | One selector per line, no header |
 | `system-id` | The file |
 | `storage-id` | The file |
-| `intelligence-search`, `identity-portal` | Not available: `400 unsupported_format` |
+| `intelligence-search`, `identity-portal`, `breach-search` | Not available: `400 unsupported_format` |
+
+Breach Search has no text output on purpose: its records change columns from one breach to the next, and a plain list of values would only be a ready-made contact list.
 
 A text response is a `text/plain; charset=utf-8` attachment. The billing and quota headers are the same as for JSON, since there is no body to carry `billed`:
 

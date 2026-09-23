@@ -8,7 +8,7 @@ description: "Get your API key and send it in a header."
 Open [Dashboard → API](https://findly.icu/dashboard/api). Your key is created the first time you open the page, and you can copy it from there at any time.
 
 - Each account has **one** key. It looks like `fly_live_` followed by 32 letters and digits.
-- It acts as your account: same plan, same quota, same limits. Keep it private, like a password.
+- It acts as your account: same plan, same quotas (IntelX requests and Breach Search), same limits. Keep it private, like a password.
 - **Regenerate** (password required) creates a new key and deletes the current one right away. Any call still using the old key gets `401 invalid_api_key`.
 
 ## Send the key
@@ -61,4 +61,4 @@ curl https://findly.icu/api/v1/usage -H "Authorization: Bearer $FINDLY_API_KEY"
 
 ## Test a key
 
-`GET /api/v1/usage` is never billed and never runs a search. A `200` response means the key works and the plan includes API access.
+`GET /api/v1/usage` is never billed and never runs a search. A `200` response means the key works and the plan includes API access; its body gives both of today's quotas (`usage` for IntelX requests, `breach_usage` for Breach Search).

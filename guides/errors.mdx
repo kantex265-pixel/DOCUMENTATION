@@ -11,7 +11,7 @@ Every error has the same JSON shape:
 {
   "error": {
     "code": "rate_limited",
-    "message": "Too many searches in the last minute. Try again shortly.",
+    "message": "Limit of 20 searches or downloads per minute reached. Try again shortly. No request was used.",
     "reason": "per-minute"
   },
   "billed": false
@@ -30,7 +30,7 @@ Every error has the same JSON shape:
 | --- | --- | --- | --- | --- |
 | 400 | `api_key_in_url` | | A `key`, `api_key`, `apikey`, `token` or `access_token` query parameter was sent | Send the key in a header. Regenerate it if it was logged |
 | 400 | `invalid_json` | | Empty body, invalid JSON or UTF-8, or not a JSON object | Send a JSON object |
-| 400 | `unsupported_format` | | `format` is not `json`, or `txt` on Intelligence Search or Identity Portal | Use `json`, or `txt` on Phonebook, System ID, Storage ID |
+| 400 | `unsupported_format` | | `format` is not `json`, or `txt` on Intelligence Search, Identity Portal or Breach Search | Use `json`, or `txt` on Phonebook, System ID, Storage ID |
 | 401 | `missing_api_key` | | No `Authorization` or `X-API-Key` header | Add the header |
 | 401 | `invalid_api_key` | | Malformed, unknown or regenerated key | Copy the current key from the dashboard |
 | 403 | `account_suspended` | | The account is suspended | Contact support |
@@ -40,14 +40,29 @@ Every error has the same JSON shape:
 | 404 | `not_found` | | No endpoint at this path, or a Stealer Export with no logs attached | Check the URL; for an export, the request was given back |
 | 400 | `not_a_search_module` | | `stealer-export` was called as a search module | Use `POST /api/v1/stealer-export` |
 | 413 | `body_too_large` | | Body over 16 KB | Send a smaller body |
-| 422 | `invalid_input` | `fields` | Unknown field, wrong type or invalid value | Fix the fields listed in `fields` |
-| 429 | `too_many_requests` | | Over 60 calls a minute from your IP address | Wait `Retry-After` seconds |
-| 429 | `quota_exceeded` | | No requests left today | Wait for the 02:00 Paris reset, or upgrade |
-| 429 | `rate_limited` | `reason` | `concurrent`: 2 searches already running. `per-minute`: 20 searches in the last minute | Wait `Retry-After` seconds |
+| 422 | `invalid_input` | `fields` | Unknown field, wrong type or invalid value (for Breach Search advanced fields, the key is `fields.<name>`) | Fix the fields listed in `fields` |
+| 429 | `too_many_requests` | `reason` | Over 60 calls a minute from your IP address (no `reason`), or a limit of the whole service — see below | Wait `Retry-After` seconds |
+| 429 | `quota_exceeded` | | No requests left today in the quota this call draws from (IntelX requests, or Breach Search) | Wait for the 02:00 Paris reset, or upgrade |
+| 429 | `rate_limited` | `reason` | A limit of your account — see below | Wait `Retry-After` seconds |
 | 500 | `internal_error` | | Unexpected error on our side | Retry later |
-| 502 | `upstream_error` | `upstream_status` | The search service failed, timed out (30 s), or sent an unreadable or oversized response | Retry in a minute; narrow the search if it was too large |
+| 502 | `upstream_error` | `upstream_status` | The search service failed, timed out (30 s for IntelX, 20 s for Breach Search), or sent an unreadable or oversized response | Retry in a minute; narrow the search if it was too large |
 
-`upstream_status` is the HTTP status the search service returned when it returned one (400 or above), otherwise `null`. On `upstream_error`, `billed` is `false` because the request is refunded.
+`upstream_status` is the HTTP status the search service returned when it returned one (400 or above), otherwise `null`. On `upstream_error`, `billed` is `false` because the request is refunded. The search service is Intelligence X for the IntelX modules, and Find.ly's own breach index for Breach Search.
+
+## `429` reasons
+
+`rate_limited` is a limit of **your account**; `too_many_requests` a limit of **the whole service** (or of your IP address). The `reason` field says which:
+
+| `code` | `reason` | Meaning | `Retry-After` |
+| --- | --- | --- | --- |
+| `too_many_requests` | *(none)* | Over 60 API calls in one minute from your IP address | Until a slot frees up |
+| `too_many_requests` | `server-busy` | Find.ly is already running as many searches as it can (3 IntelX, 6 Breach Search, all accounts together) | A few seconds |
+| `too_many_requests` | `service-paused` | The search service refused or was saturated a moment ago, so searches to it are paused briefly | Until the pause ends |
+| `rate_limited` | `concurrent` | 2 searches or downloads already running on your account | 3 seconds |
+| `rate_limited` | `per-minute` | 20 searches or downloads in the last minute on your account | Until a slot frees up |
+| `rate_limited` | `refund-cap` | Too many IntelX requests given back today (see [Refund cap](/guides/billing-and-quotas#refund-cap-intelx)); carries `usage` | Until the 02:00 Paris reset |
+
+IntelX and Breach Search pause independently: a paused IntelX never blocks Breach Search, and the other way round.
 
 ## Field errors
 
@@ -66,6 +81,21 @@ Every error has the same JSON shape:
 }
 ```
 
+For Breach Search advanced fields, an unknown or sensitive key is reported under `fields.<name>`:
+
+```json
+{
+  "error": {
+    "code": "invalid_input",
+    "message": "Some fields are invalid. No request was used.",
+    "fields": {
+      "fields.iban": "Unknown field. Accepted: full_name, first_name, last_name, username, email, phone, company, city, region."
+    }
+  },
+  "billed": false
+}
+```
+
 ## Order of checks
 
 A search is checked in this order, and the first failure is returned:
@@ -77,9 +107,11 @@ A search is checked in this order, and the first failure is returned:
 5. `format` (`unsupported_format`)
 6. Body size and JSON (`body_too_large`, `invalid_json`)
 7. Fields (`invalid_input`)
-8. Account limits (`rate_limited`)
-9. Module in plan (`module_locked`), then daily quota (`quota_exceeded`)
-10. The search itself (`upstream_error`)
+8. Service paused (`too_many_requests`, `service-paused`)
+9. Searches running: on your account (`rate_limited`, `concurrent`), then on the whole service (`too_many_requests`, `server-busy`)
+10. Searches in the last minute (`rate_limited`, `per-minute`)
+11. Module in plan (`module_locked`), daily quota (`quota_exceeded`), then refund cap (`rate_limited`, `refund-cap`)
+12. The search itself (`upstream_error`)
 
 ## Other responses
 

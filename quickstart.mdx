@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "Check your key, run a search and download a raw file with curl."
+description: "Check your key and quotas, run a search, download a raw file and look a person up in Breach Search, with curl."
 ---
 
 You need a Professional or Enterprise plan and your key from [Dashboard → API](https://findly.icu/dashboard/api). The examples use `fly_live_XXXX`: replace it with your key.
@@ -12,7 +12,7 @@ You need a Professional or Enterprise plan and your key from [Dashboard → API]
     ```
   </Step>
 
-  <Step title="Check your plan and quota (free)">
+  <Step title="Check your plan and quotas (free)">
     ```bash
     curl https://findly.icu/api/v1/usage \
       -H "Authorization: Bearer $FINDLY_API_KEY"
@@ -21,7 +21,23 @@ You need a Professional or Enterprise plan and your key from [Dashboard → API]
     ```json
     {
       "username": "acme-security",
-      "modules": ["intelligence-search", "phonebook", "identity-portal", "system-id", "storage-id"],
+      "modules": [
+        "intelligence-search",
+        "phonebook",
+        "identity-portal",
+        "system-id",
+        "storage-id",
+        "breach-search",
+        "stealer-export"
+      ],
+      "breach_usage": {
+        "plan": "Professional",
+        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+        "daily_quota": 800,
+        "used": 3,
+        "remaining": 797,
+        "resets_at": "2026-09-17T00:00:00.000Z"
+      },
       "billed": false,
       "usage": {
         "plan": "Professional",
@@ -33,6 +49,9 @@ You need a Professional or Enterprise plan and your key from [Dashboard → API]
       }
     }
     ```
+
+    Two quotas: `usage` is your **IntelX request** quota (IntelX modules and Stealer Export), `breach_usage` your
+    **Breach Search** bucket. Spending one never touches the other.
   </Step>
 
   <Step title="Run a search (1 request)">
@@ -90,6 +109,63 @@ You need a Professional or Enterprise plan and your key from [Dashboard → API]
     ```
 
     `-OJ` saves it under the name from `Content-Disposition`. See [Raw files and text output](/guides/raw-files).
+  </Step>
+
+  <Step title="Look a person up with Breach Search (1 Breach Search request)">
+    The base request is a single free-text `query` — an email, a full name, a username, a phone number:
+
+    ```bash
+    curl https://findly.icu/api/v1/search/breach-search       -H "Authorization: Bearer $FINDLY_API_KEY"       -H "Content-Type: application/json"       -d '{"query": "jane.doe@example.com"}'
+    ```
+
+    To narrow to one person, combine named fields instead; every field must match:
+
+    ```bash
+    curl https://findly.icu/api/v1/search/breach-search       -H "Authorization: Bearer $FINDLY_API_KEY"       -H "Content-Type: application/json"       -d '{"fields": {"city": "Paris", "last_name": "Dupont", "first_name": "Jean"}}'
+    ```
+
+    ```json
+    {
+      "module": "breach-search",
+      "query": "City: Paris · Last name: Dupont · First name: Jean",
+      "total": 1,
+      "total_is_lower_bound": false,
+      "returned": 1,
+      "truncated": false,
+      "partial": false,
+      "sources": {
+        "acme-2023": {
+          "id": "acme-2023",
+          "name": "Acme 2023",
+          "site": "acme.example",
+          "description": null,
+          "date": "2023-05-01",
+          "date_kind": "disclosed"
+        }
+      },
+      "results": [
+        {
+          "breach_id": "acme-2023",
+          "breach_name": "Acme 2023",
+          "breach_date": "2023-05-01",
+          "record": { "full_name": "Jean Dupont", "city": "Paris", "email": "jean.dupont@example.com" },
+          "masked_fields": []
+        }
+      ],
+      "billed": true,
+      "usage": {
+        "plan": "Professional",
+        "plan_expires_at": "2026-10-16T12:00:00.000Z",
+        "daily_quota": 800,
+        "used": 4,
+        "remaining": 796,
+        "resets_at": "2026-09-17T00:00:00.000Z"
+      }
+    }
+    ```
+
+    Here `usage` is the **Breach Search** bucket (800 a day on Professional), not the IntelX quota. See
+    [Breach Search](/guides/modules#breach-search).
   </Step>
 </Steps>
 

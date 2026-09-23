@@ -1,62 +1,73 @@
 ---
 title: "Billing and quotas"
-description: "What uses a request, what is free, and how to read your quota from every response."
+description: "Two daily quotas — IntelX requests and Breach Search — what uses each, what is free, and how to read them from every response."
 ---
 
-## Daily quota
+Every account has **two daily quotas**, and spending one never touches the other:
 
-| Plan | API access | Requests per day | Modules |
-| --- | --- | --- | --- |
-| Free | No | 3 | System ID, Storage ID |
-| Starter | No | 100 | Intelligence Search, System ID, Storage ID |
-| **Professional** | **Yes** | **500** | All IntelX modules, plus Stealer Export |
-| **Enterprise** | **Yes** | **1,500** | All IntelX modules, plus Stealer Export |
+- **IntelX requests** — the IntelX modules (Intelligence Search, Phonebook, Identity Portal, System ID, Storage ID) and Stealer Export.
+- **Breach Search** — our own module, on the breach index Find.ly runs itself.
 
-- The quota resets every day at **02:00 Europe/Paris** time. `usage.resets_at` gives the exact instant.
-- The quota belongs to the account: searches in the dashboard and through the API draw from the same pool.
+## Daily quotas
+
+| Plan | API access | IntelX requests per day | Breach Search per day | Modules |
+| --- | --- | --- | --- | --- |
+| Free | No | 3 | — | System ID, Storage ID |
+| Starter | No | 100 | 100 | Intelligence Search, System ID, Storage ID, Breach Search |
+| **Professional** | **Yes** | **500** | **800** | Every module, plus Stealer Export |
+| **Enterprise** | **Yes** | **1,500** | **5,000** | Every module, plus Stealer Export |
+
+- Both quotas reset every day at **02:00 Europe/Paris** time. `resets_at` gives the exact instant.
+- Quotas belong to the account: searches in the dashboard and through the API draw from the same two pools.
 - Unused requests do not carry over.
 - Plans last for the period you bought and do not renew automatically. When a plan ends, the account is back on Free and the API answers `403 plan_required`.
-
-## Breach Search quota
-
-`breach-search` runs on our own index, so it has its **own daily bucket**, separate from the request quota above. Spending one does not touch the other.
-
-| Plan | Breach searches per day |
-| --- | --- |
-| Free | None (no access) |
-| Starter | 100 |
-| **Professional** | **800** |
-| **Enterprise** | **5,000** |
-
-- One served Breach Search costs **1** from this bucket; a search that finds nothing still costs 1, and a refunded failure costs nothing — the same rules as the request quota.
-- The bucket resets at **02:00 Europe/Paris**, and the dashboard and API draw from the same one.
-- A `breach-search` response's `usage` block reports **this** bucket, so its `daily_quota`, `used` and `remaining` differ from the other modules on the same key. When it runs out, the module answers `429 quota_exceeded` like any other quota.
-- API access follows the table above: only Professional and Enterprise hold API keys, so Starter's 100 is a dashboard bucket.
+- Only Professional and Enterprise hold API keys: on Starter, both quotas are used from the dashboard.
 
 ## What uses a request
 
-| Call | Cost |
-| --- | --- |
-| A served search (records, selectors or a file) | **1 request** |
-| A successful search that finds nothing | **1 request** |
-| The same search with `?format=txt` | **1 request** (same call, different output) |
-| Downloading a raw file (System ID or Storage ID) | **1 request** |
-| A Stealer Export archive | **1 request per export**, whatever it holds |
-| `GET /api/v1/usage` | Free |
-| Invalid input (`422`), bad JSON, wrong format | Free |
-| Authentication, plan, module, quota and rate-limit refusals | Free |
-| The search service fails, times out or sends an unreadable response (`502`) | Free (refunded) |
-| The search service reports that nothing exists for this input | Free (refunded) |
-| A Stealer Export that finds no logs, or an archive over 32 MB | Free (refunded) |
-| Server error (`500`) | Free |
+| Call | Quota | Cost |
+| --- | --- | --- |
+| A served IntelX search (records, selectors or a file) | IntelX | **1 request** |
+| A successful IntelX search that finds nothing | IntelX | **1 request** |
+| The same search with `?format=txt` | IntelX | **1 request** (same call, different output) |
+| Downloading a raw file (System ID or Storage ID) | IntelX | **1 request** |
+| A Stealer Export archive | IntelX | **1 request per export**, whatever it holds |
+| A served Breach Search, free query or combined fields | Breach Search | **1 request** |
+| A complete Breach Search that finds nothing | Breach Search | **1 request** |
+| `GET /api/v1/usage` | — | Free |
+| Invalid input (`422`), bad JSON, wrong format | — | Free |
+| Authentication, plan, module, quota and rate-limit refusals | — | Free |
+| The search service fails, times out or sends an unreadable response (`502`) | Either | Free (refunded) |
+| IntelX reports that nothing exists for this input | IntelX | Free (refunded) |
+| A Breach Search that runs out of time before finding anything (`partial`) | Breach Search | Free (refunded) |
+| A Stealer Export that finds no logs, or an archive over 32 MB | IntelX | Free (refunded) |
+| Server error (`500`) | — | Free |
 
 There is no charge for paging, filtering or exporting what you already received: it is all in the response. See [Pagination](/guides/pagination).
+
+## Refund cap (IntelX)
+
+Refunds are free for you, but not unlimited. Once, in one day, as many IntelX requests have been given back as your daily quota (at least 10) — or three times that many when the refunds come from service outages — new IntelX searches pause until the 02:00 reset:
+
+```json
+{
+  "error": {
+    "code": "rate_limited",
+    "message": "You’ve reached today’s limit of 500 requests given back (searches that found nothing or couldn’t be completed). You can search again after 02:00 Paris time. No request was used.",
+    "reason": "refund-cap"
+  },
+  "billed": false,
+  "usage": { "plan": "Professional", "daily_quota": 500, "used": 120, "remaining": 380, "plan_expires_at": "2026-10-16T12:00:00.000Z", "resets_at": "2026-09-17T00:00:00.000Z" }
+}
+```
+
+The status is `429` and `Retry-After` runs until the reset. Breach Search has no refund cap.
 
 ## Know what a call cost
 
 Every JSON response has a `billed` boolean, and every response has an `X-Request-Billed: true|false` header. Rely on them instead of the status code: an empty result can be billed (`200`, `billed: true`) or refunded (`200`, `billed: false`).
 
-When the account quota is known, the response also carries it after the call:
+When the quota is known, the response also carries it after the call — **the quota the call drew from**: the IntelX quota for IntelX modules and Stealer Export, the Breach Search bucket for `breach-search`.
 
 <CodeGroup>
 
@@ -87,14 +98,36 @@ X-Quota-Reset: 2026-09-17T00:00:00.000Z
 | --- | --- |
 | `plan` | `Free`, `Starter`, `Professional` or `Enterprise` |
 | `plan_expires_at` | End of the paid plan, `null` on Free |
-| `daily_quota` | Requests per day for this plan |
-| `used` | Requests used today (dashboard and API) |
-| `remaining` | Requests left today |
+| `daily_quota` | Requests per day in this quota, for this plan |
+| `used` | Requests used today in this quota (dashboard and API) |
+| `remaining` | Requests left today in this quota |
 | `resets_at` | Next reset (02:00 Europe/Paris) |
 
-`usage` and `X-Quota-*` are present on `GET /api/v1/usage`, on served searches, and on `plan_required`, `module_locked`, `unknown_module`, `quota_exceeded` and `upstream_error`. They are absent on the other errors (authentication, `too_many_requests`, `rate_limited`, body and input errors, `internal_error`), which are returned before the account quota is read.
+On a `breach-search` response, `usage` and `X-Quota-*` describe the Breach Search bucket, so `daily_quota` is 800 or 5,000 where an IntelX search on the same key shows 500 or 1,500.
 
-## When the quota runs out
+`usage` and `X-Quota-*` are present on `GET /api/v1/usage`, on served searches, and on `plan_required`, `module_locked`, `unknown_module`, `quota_exceeded`, `upstream_error` and the `refund-cap` refusal. They are absent on the other errors (authentication, `too_many_requests`, other `rate_limited` reasons, body and input errors, `internal_error`), which are returned before the quota is read.
+
+## Check both quotas for free
+
+`GET /api/v1/usage` never uses a request. `usage` is the IntelX quota; `breach_usage` is the Breach Search bucket, in the same shape:
+
+```bash
+curl https://findly.icu/api/v1/usage -H "Authorization: Bearer fly_live_XXXX"
+```
+
+```json
+{
+  "username": "acme-security",
+  "modules": ["intelligence-search", "phonebook", "identity-portal", "system-id", "storage-id", "breach-search", "stealer-export"],
+  "breach_usage": { "plan": "Professional", "plan_expires_at": "2026-10-16T12:00:00.000Z", "daily_quota": 800, "used": 3, "remaining": 797, "resets_at": "2026-09-17T00:00:00.000Z" },
+  "billed": false,
+  "usage": { "plan": "Professional", "plan_expires_at": "2026-10-16T12:00:00.000Z", "daily_quota": 500, "used": 12, "remaining": 488, "resets_at": "2026-09-17T00:00:00.000Z" }
+}
+```
+
+The `X-Quota-*` headers of this call describe the IntelX quota.
+
+## When a quota runs out
 
 ```json
 {
@@ -107,4 +140,4 @@ X-Quota-Reset: 2026-09-17T00:00:00.000Z
 }
 ```
 
-The status is `429`, and `Retry-After` gives the seconds until the reset. Retrying earlier only returns the same error. Check `remaining` before a batch instead: `GET /api/v1/usage` is free.
+The status is `429`, and `Retry-After` gives the seconds until the reset. The refusal only concerns the quota that ran out: with no IntelX requests left, Breach Search still works, and the other way round — `usage` tells you which one it was. Retrying earlier only returns the same error. Check `remaining` and `breach_usage.remaining` before a batch instead: `GET /api/v1/usage` is free.

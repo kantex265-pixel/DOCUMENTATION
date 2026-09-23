@@ -23,9 +23,9 @@ POST https://findly.icu/api/v1/search/{module}
 Professional and Enterprise include every search module (and Stealer Export, below). An unknown slug returns `404 unknown_module`.
 
 <Note>
-  **`breach-search` draws from a separate daily bucket**, not the request quota in the table above — see
-  [Billing and quotas](/guides/billing-and-quotas#breach-search-quota). Its `usage` block therefore reports the
-  breach bucket, so `daily_quota` differs from the other modules on the same key.
+  **`breach-search` draws from its own daily bucket**, not the IntelX request quota — see
+  [Billing and quotas](/guides/billing-and-quotas#daily-quotas). Its `usage` block therefore reports the Breach Search
+  bucket, so `daily_quota` differs from the other modules on the same key.
 </Note>
 
 <Note>
@@ -38,12 +38,16 @@ Professional and Enterprise include every search module (and Stealer Export, bel
 
 - The body must be a JSON object of **16 KB or less** (`400 invalid_json`, `413 body_too_large`). `Content-Type: application/json` is recommended but not required.
 - **Unknown fields are rejected** with `422 invalid_input`, so a typo such as `systemId` is reported instead of ignored.
-- Values are **strings**. `max_results` also accepts a JSON number. `null` counts as absent.
-- Leading and trailing spaces are trimmed. Text fields are limited to 200 characters.
+- Values are **strings**. `max_results` also accepts a JSON number, and Breach Search's `fields` is an object of strings. `null` counts as absent.
+- Leading and trailing spaces are trimmed. Text fields are limited to 200 characters (256 for Breach Search).
 - Invalid input returns `422 invalid_input` with one message per field in `error.fields`, and is **never billed**.
 - `GET` is not supported: a search value in a URL would end up in logs.
 
-## Intelligence Search
+## IntelX Modules
+
+Powered by our search provider, **Intelligence X**. Every search here draws **1 IntelX request**; so does Stealer Export, documented on [its own page](/guides/stealer-export).
+
+### Intelligence Search
 
 Free-text search by email, username, domain or keyword.
 
@@ -73,7 +77,7 @@ curl https://findly.icu/api/v1/search/intelligence-search \
   -d '{"query": "example.com", "max_results": 200, "date_from": "2024-01-01", "date_to": "2024-12-31"}'
 ```
 
-## Phonebook
+### Phonebook
 
 Every known selector for a domain. `type` decides both what you get back and the shape `query` must have.
 
@@ -99,7 +103,7 @@ curl https://findly.icu/api/v1/search/phonebook \
   -d '{"type": "email", "query": "@example.com"}'
 ```
 
-## Identity Portal
+### Identity Portal
 
 <ParamField body="query" type="string" required>
   Email address, domain or other selector. 200 characters max.
@@ -112,7 +116,7 @@ curl https://findly.icu/api/v1/search/identity-portal \
   -d '{"query": "john.doe@example.com"}'
 ```
 
-## System ID
+### System ID
 
 Downloads the raw file behind a result.
 
@@ -120,7 +124,7 @@ Downloads the raw file behind a result.
   UUID (`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`), usually `results[].system_id` from Intelligence Search or Identity Portal. Case-insensitive.
 </ParamField>
 
-## Storage ID
+### Storage ID
 
 Downloads a raw file by storage ID.
 
@@ -140,13 +144,17 @@ Downloads a raw file by storage ID.
 
 Both file modules are covered in [Raw files and text output](/guides/raw-files).
 
-## Breach Search
+## FindLy Module
+
+Our own module, on the breach index Find.ly ingests and documents itself. It draws from the separate **Breach Search** bucket, never from the IntelX request quota.
+
+### Breach Search
 
 Records for one person across our own breach index. The base request is a **single free-text value** — no options — and that covers most searches. An **advanced** form lets you combine named fields when you need to narrow to one person.
 
 Send `query`, `fields`, or both. At least one is required.
 
-### Base search
+#### Base search
 
 <ParamField body="query" type="string" required>
   Anything that names a person — an email, a full name, a username, a phone number. 256 characters max, 3 minimum. An address is matched exactly; other text is matched across name, username, phone, company, city and more at once. Sensitive fields (IBAN, SIRET) are never searched.
@@ -159,7 +167,7 @@ curl https://findly.icu/api/v1/search/breach-search \
   -d '{"query": "jane.doe@example.com"}'
 ```
 
-### Advanced search
+#### Advanced search
 
 <ParamField body="fields" type="object">
   A map of `field: value`. Each entry is a **separate, required constraint** — the index ANDs them, so `city` + `last_name` + `first_name` narrows to the one person, where a free `query` only ranks a bag of terms. Combine it with `query` and that too must match.
@@ -176,9 +184,17 @@ curl https://findly.icu/api/v1/search/breach-search \
 
 An unknown or sensitive key returns `422 invalid_input` (as `fields.<key>`) and is never billed. A blank value is dropped; if nothing is left to search, the request is refused before it costs anything.
 
+#### What you get back
+
+- **Up to 100 records** per search, each with the breach it came from (see the *Breach records* tab below). `total` counts up to 10,000; past that, `total_is_lower_bound` is `true`.
+- There is no next page: narrow with `fields` instead.
+- No `?format=txt` (`400 unsupported_format`).
+- No password is ever returned, in clear or hashed. A partially shown value (an IBAN as its last four characters) is listed in `masked_fields`.
+- A search that takes over 20 seconds is refunded (`502 upstream_error`). If the index runs out of its own time budget, it returns what it found with `partial: true`; an empty partial result is refunded.
+
 <Note>
-  Breach Search uses a **separate daily bucket** (Starter 100, Professional 800, Enterprise 5000), independent of the
-  request quota. See [Billing and quotas](/guides/billing-and-quotas#breach-search-quota).
+  Breach Search uses a **separate daily bucket** (Starter 100, Professional 800, Enterprise 5,000), independent of the
+  IntelX request quota. See [Billing and quotas](/guides/billing-and-quotas#daily-quotas).
 </Note>
 
 ## Responses
@@ -225,7 +241,7 @@ Every successful JSON response has `module`, `billed` and `usage`.
     <ResponseField name="query" type="string">The query as searched.</ResponseField>
     <ResponseField name="total" type="number">Records found. Capped at 10,000 — see `total_is_lower_bound`.</ResponseField>
     <ResponseField name="total_is_lower_bound" type="boolean">`true` when the index stopped counting at 10,000: `total` is then a floor, not an exact count (show `10,000+`).</ResponseField>
-    <ResponseField name="returned" type="number">Records in `results`.</ResponseField>
+    <ResponseField name="returned" type="number">Records in `results`, 100 max.</ResponseField>
     <ResponseField name="truncated" type="boolean">`true` when `total` is greater than `returned`. There is no next page to request.</ResponseField>
     <ResponseField name="partial" type="boolean">`true` when the index ran out of time: the list is a start, not the whole answer. A partial **empty** result is refunded.</ResponseField>
     <ResponseField name="sources" type="object">

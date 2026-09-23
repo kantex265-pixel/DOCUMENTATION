@@ -8,15 +8,21 @@ description: "Per-address and per-account limits, size limits and how to retry."
 | Limit | Scope | Error | `Retry-After` |
 | --- | --- | --- | --- |
 | 60 calls per minute | IP address, all `/api/v1` endpoints, valid key or not | `429 too_many_requests` | Until a slot frees up |
-| 2 searches running at once | Account (dashboard and API together) | `429 rate_limited`, `reason: "concurrent"` | 3 seconds |
-| 20 searches per minute | Account (dashboard and API together) | `429 rate_limited`, `reason: "per-minute"` | Until a slot frees up |
+| 2 searches running at once | Account, all modules (dashboard and API together) | `429 rate_limited`, `reason: "concurrent"` | 3 seconds |
+| 20 searches per minute | Account, all modules (dashboard and API together) | `429 rate_limited`, `reason: "per-minute"` | Until a slot frees up |
+| 3 IntelX searches at once | Whole service, all accounts | `429 too_many_requests`, `reason: "server-busy"` | 3 seconds |
+| 6 Breach Searches at once | Whole service, all accounts | `429 too_many_requests`, `reason: "server-busy"` | 3 seconds |
 | 1 Stealer Export at a time | Account (dashboard and API together) | `429 rate_limited` | A few seconds |
 | 2 Stealer Exports at a time | Whole service, all accounts | `429 too_many_requests` | A few seconds |
-| Daily quota | Account | `429 quota_exceeded` | Until the 02:00 Paris reset |
+| Daily IntelX request quota | Account | `429 quota_exceeded` | Until the 02:00 Paris reset |
+| Daily Breach Search bucket | Account | `429 quota_exceeded` | Until the 02:00 Paris reset |
+| Refund cap (IntelX only) | Account | `429 rate_limited`, `reason: "refund-cap"` | Until the 02:00 Paris reset |
 
 Minute limits use a sliding 60-second window. Refused calls are never billed and do not count toward the window that refused them.
 
-In order, a search is checked for: IP limit, key and plan, module, format, body, input validity, concurrency, per-minute limit, then quota. So an invalid body does not use a per-minute slot, but a valid search refused for quota does.
+In order, a search is checked for: IP limit, key and plan, module, format, body, input validity, service pause, concurrency, per-minute limit, then module, quota and refund cap. So an invalid body does not use a per-minute slot, but a valid search refused for quota does. The per-account limits count IntelX and Breach Search searches together; the quotas do not.
+
+The full list of `reason` values is in [Errors](/guides/errors#429-reasons).
 
 ## Retrying
 
@@ -43,7 +49,7 @@ def search(module, body, key, attempts=3):
     return response
 ```
 
-To run many searches, keep at most **two in flight** and stay under **20 per minute** per account. Remember that searches made in the dashboard at the same time count too.
+To run many searches, keep at most **two in flight** and stay under **20 per minute** per account, IntelX and Breach Search together. Remember that searches made in the dashboard at the same time count too.
 
 Exports count toward the same 20-per-minute window, but run **one at a time per account** — an archive can reach 32 MB, so a second one is refused rather than queued.
 
@@ -52,9 +58,14 @@ Exports count toward the same 20-per-minute window, but run **one at a time per 
 | Limit | Value | What happens |
 | --- | --- | --- |
 | Request body | 16 KB | `413 body_too_large` |
-| Items in one list response | 5,000 | The list is cut; `truncated: true`, `total` keeps the real count |
+| Items in one IntelX list response | 5,000 | The list is cut; `truncated: true`, `total` keeps the real count |
+| Records in one Breach Search response | 100 | `truncated: true`; `total` counts up to 10,000 (`total_is_lower_bound: true` beyond) |
+| Breach Search advanced fields | 10 per request, 2–256 characters each | `422 invalid_input` |
 | Raw file delivered | 8 MB | The text is cut; `file.truncated: true` |
-| Search response read by Find.ly | 16 MB | Lists: `502 upstream_error` (refunded). Files: `502 upstream_error` (refunded) when the size is known in advance, otherwise the first 8 MB with `total_bytes: null` |
-| Search duration | 30 seconds | `502 upstream_error` (refunded) |
+| IntelX response read by Find.ly | 16 MB | Lists: `502 upstream_error` (refunded). Files: `502 upstream_error` (refunded) when the size is known in advance, otherwise the first 8 MB with `total_bytes: null` |
+| Breach Search response read by Find.ly | 4 MB | `502 upstream_error` (refunded) |
+| IntelX search duration | 30 seconds | `502 upstream_error` (refunded) |
+| Breach Search duration | 20 seconds | `502 upstream_error` (refunded) |
+| Breach index time budget | per search | The index returns what it found in time with `partial: true` — billed if it holds records, refunded (`502`) if empty |
 
 Set your HTTP client timeout above 30 seconds (60 is a good value), or a slow search may be billed on our side while your client has already given up.

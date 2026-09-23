@@ -1,12 +1,13 @@
 ---
 title: "Introduction"
-description: "Run Find.ly searches and exports from your own code: the same modules, quota and limits as the dashboard."
+description: "Run Find.ly searches and exports from your own code: the same modules, quotas and limits as the dashboard."
 ---
 
-The Find.ly API gives your scripts and servers the same searches as the [Find.ly dashboard](https://findly.icu/dashboard): leak records, selectors for a domain, raw files and stealer-log archives. It is a small JSON-over-HTTPS API with three endpoints.
+The Find.ly API gives your scripts and servers the same searches as the [Find.ly dashboard](https://findly.icu/dashboard): leak records, selectors for a domain, raw files, stealer-log archives, and a person's records in our own breach index. It is a small JSON-over-HTTPS API with three endpoints.
 
 <Note>
-  API access comes with the **Professional** (500 requests a day) and **Enterprise** (1,500 requests a day) plans. See [pricing](https://findly.icu/#pricing).
+  API access comes with the **Professional** and **Enterprise** plans. Professional gives 500 IntelX requests and 800
+  Breach Search requests a day; Enterprise gives 1,500 and 5,000. See [pricing](https://findly.icu/#pricing).
 </Note>
 
 ## Base URL
@@ -21,31 +22,41 @@ HTTPS only. Every response is sent with `Cache-Control: no-store`.
 
 | Method | Path | What it does | Billed |
 | --- | --- | --- | --- |
-| `GET` | `/api/v1/usage` | Plan, today's quota and open modules | Never |
+| `GET` | `/api/v1/usage` | Plan, both of today's quotas and open modules | Never |
 | `POST` | `/api/v1/search/{module}` | One search in one module | 1 request when served |
 | `POST` | `/api/v1/stealer-export` | Every stealer log of one System ID, as a `.zip` | 1 request per export |
 
-`{module}` is one of `intelligence-search`, `phonebook`, `identity-portal`, `system-id` or `storage-id`. See [Modules and inputs](/guides/modules).
+## Modules
 
-Stealer Export is **not** a search module: it answers with a file rather than JSON, and belongs to the **Professional** and **Enterprise** plans. See [Stealer Export](/guides/stealer-export).
+Find.ly serves its own modules, from two sources:
+
+- **IntelX Modules**, powered by our search provider Intelligence X: `intelligence-search`, `phonebook`, `identity-portal`, `system-id`, `storage-id`, plus the Stealer Export archive.
+- **FindLy Module**: `breach-search`, which runs on a breach index Find.ly ingests and documents itself.
+
+`{module}` is one of the six search slugs above. See [Modules and inputs](/guides/modules).
+
+Stealer Export is **not** a search module: it answers with a file rather than JSON, so it has its own endpoint. See [Stealer Export](/guides/stealer-export).
 
 ## How it works
 
-- **One account, one quota.** A key acts as your account. Searches made through the API and in the dashboard share the same daily quota and the same per-account limits.
-- **Every response tells you what it cost.** JSON responses carry `billed` and a `usage` object; JSON and text responses carry `X-Request-Billed`, and `X-Quota-*` headers whenever the quota is known.
-- **Errors are free.** Invalid input, refused calls and service failures never use a request. See [Billing and quotas](/guides/billing-and-quotas).
+- **One account, two quotas.** A key acts as your account. IntelX modules and Stealer Export draw from the daily **IntelX request** quota; Breach Search draws from its **own** daily bucket. The dashboard and the API share both, and the same per-account limits. See [Billing and quotas](/guides/billing-and-quotas).
+- **Every response tells you what it cost.** JSON responses carry `billed` and a `usage` object for the quota the call drew from; JSON and text responses carry `X-Request-Billed`, and `X-Quota-*` headers whenever the quota is known.
+- **Errors are free.** Invalid input, refused calls and service failures never use a request.
 - **Server-side only.** The API sends no CORS headers: browsers cannot read its responses. Call it from a server, a script or a terminal, never from a web page.
-- **Nothing is stored.** Search results are sent back to you and not kept, so there is no server-side pagination: you get the whole list (up to 5,000 items) at once. See [Pagination](/guides/pagination).
+- **Nothing is stored.** Results are sent back to you and not kept, so there is no server-side pagination: you get the whole list at once — up to 5,000 items from an IntelX module, up to 100 records from Breach Search. See [Pagination](/guides/pagination).
 
 <Columns cols={2}>
   <Card title="Quickstart" icon="terminal" href="/quickstart">
-    Your first call in a minute, with curl.
+    Your first calls in a minute, with curl.
   </Card>
   <Card title="Authentication" icon="key" href="/authentication">
     Get your key and send it the right way.
   </Card>
   <Card title="Modules and inputs" icon="layer-group" href="/guides/modules">
     Request bodies and responses for each module.
+  </Card>
+  <Card title="Breach Search" icon="database" href="/guides/modules#breach-search">
+    A free-text query, or combined fields, on our own index.
   </Card>
   <Card title="Errors" icon="triangle-exclamation" href="/guides/errors">
     Every error code, its status and what to do.
