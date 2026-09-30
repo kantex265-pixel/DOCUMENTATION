@@ -6,19 +6,33 @@ This folder is a standalone [Mintlify](https://mintlify.com) project. It is not 
 
 ```text
 docs/
-├── docs.json                  site config: name, colors, navigation
-├── openapi.json               OpenAPI 3.1 spec, generates the "API reference" pages
-├── index.mdx                  Introduction
-├── authentication.mdx
+├── docs.json                  site config: theme (almond), colors, logo, tabs and navigation
+├── openapi.json               OpenAPI 3.1 spec, generates the endpoint pages of the "API Reference" tab
+├── style.css                  Find.ly look (borders, radius, fonts), loaded by Mintlify on every page
+├── same-tab.js                links to findly.icu open in the same tab, without the "external" arrow
+├── favicon.png                the Find.ly mark (site/src/app/icon.png)
+├── logo/                      light.png (dark text, light mode), dark.png (white text, dark mode)
+├── images/api-map.svg         illustration of the home page
+├── index.mdx                  Documentation tab: Home
 ├── quickstart.mdx
-└── guides/
-    ├── modules.mdx
-    ├── billing-and-quotas.mdx
-    ├── rate-limits.mdx
-    ├── stealer-export.mdx
-    ├── errors.mdx
-    ├── pagination.mdx
-    └── raw-files.mdx
+├── authentication.mdx
+├── guides/
+│   ├── modules.mdx
+│   ├── raw-files.mdx
+│   ├── stealer-export.mdx
+│   ├── pagination.mdx
+│   ├── billing-and-quotas.mdx
+│   ├── rate-limits.mdx
+│   └── errors.mdx
+├── api-reference/
+│   └── overview.mdx           API Reference tab: Overview (endpoints come from openapi.json)
+└── code-examples/             Code Examples tab: plain HTTP calls, no SDK
+    ├── overview.mdx
+    ├── curl.mdx
+    ├── python.mdx
+    ├── javascript.mdx
+    ├── go.mdx
+    └── php.mdx
 ```
 
 ## Publish it
@@ -85,17 +99,22 @@ The docs describe what the code does. When one of these changes, update the docs
 
 | Code (`site/src/...`) | Docs to update |
 | --- | --- |
-| `lib/public-api/auth.ts` (headers, IP limit, error codes) | `authentication.mdx`, `guides/rate-limits.mdx`, `guides/errors.mdx`, `openapi.json` |
-| `lib/public-api/http.ts` (envelope, `billed`, `X-Quota-*`, body size) | `guides/billing-and-quotas.mdx`, `guides/errors.mdx`, `openapi.json` |
-| `lib/public-api/search.ts` (fields, formats, response shapes) | `guides/modules.mdx`, `guides/raw-files.mdx`, `openapi.json` |
+| `lib/public-api/auth.ts` (headers, IP limit, error codes) | `authentication.mdx`, `api-reference/overview.mdx`, `guides/rate-limits.mdx`, `guides/errors.mdx`, `openapi.json` |
+| `lib/public-api/http.ts` (envelope, `billed`, `X-Quota-*`, body size) | `api-reference/overview.mdx`, `guides/billing-and-quotas.mdx`, `guides/errors.mdx`, `openapi.json`, `code-examples/*` (helpers) |
+| `lib/public-api/search.ts` (fields, formats, response shapes) | `guides/modules.mdx`, `guides/raw-files.mdx`, `api-reference/overview.mdx`, `openapi.json`, `code-examples/*` |
 | `lib/intelx/validate.ts`, `lib/intelx/catalog.ts` (input rules, buckets) | `guides/modules.mdx`, `openapi.json` |
-| `lib/search.ts` (billing, refunds, per-account limits) | `guides/billing-and-quotas.mdx`, `guides/rate-limits.mdx` |
-| `lib/plan-rules.ts`, `lib/site.ts` (quotas, modules, `apiAccess`) | `index.mdx`, `guides/billing-and-quotas.mdx` |
-| `lib/breachdb/*` (Breach Search input, advanced fields, limits) | `guides/modules.mdx` (FindLy Module), `guides/rate-limits.mdx`, `guides/pagination.mdx`, `openapi.json` |
-| `app/api/v1/usage/route.ts` (`usage`, `breach_usage`) | `authentication.mdx`, `quickstart.mdx`, `guides/billing-and-quotas.mdx`, `openapi.json` |
+| `lib/search.ts` (billing, refunds, per-account limits) | `guides/billing-and-quotas.mdx`, `guides/rate-limits.mdx`, `api-reference/overview.mdx` |
+| `lib/plan-rules.ts`, `lib/site.ts` (quotas, modules, `apiAccess`) | `index.mdx`, `api-reference/overview.mdx`, `guides/billing-and-quotas.mdx` |
+| `lib/breachdb/*` (Breach Search input, advanced fields, limits) | `guides/modules.mdx` (FindLy Module), `guides/rate-limits.mdx`, `guides/pagination.mdx`, `openapi.json`, `code-examples/*` (Breach Search) |
+| `app/api/v1/usage/route.ts` (`usage`, `breach_usage`) | `index.mdx`, `authentication.mdx`, `quickstart.mdx`, `guides/billing-and-quotas.mdx`, `openapi.json`, `code-examples/*` |
+| `app/api/v1/stealer-export/route.ts` (archive, headers) | `guides/stealer-export.mdx`, `openapi.json`, `code-examples/*` (Stealer Export) |
+| `public/brand/logo-transparent.png`, `app/icon.png` (branding) | `logo/`, `favicon.png` |
 
 Notes:
 
-- The API reference has one page per module (`/api/v1/search/intelligence-search`, …) rather than a single `{module}` page, because each module takes a different body and returns a different shape. They are grouped as **IntelX Modules** (the five IntelX searches, plus Stealer Export) and **FindLy Module** (Breach Search). All six search pages are the same route in the code.
+- Navigation has three tabs: **Documentation** (Getting Started, Search Guides, Integration Guides), **API Reference** (Overview, then the endpoints generated from `openapi.json`) and **Code Examples**.
+- The API reference has one page per module (`/api/v1/search/intelligence-search`, …) rather than a single `{module}` page, because each module takes a different body and returns a different shape. They are grouped as **Account** (`GET /api/v1/usage`), **IntelX Modules** (the five IntelX searches, plus Stealer Export) and **FindLy Module** (Breach Search). All six search pages are the same route in the code.
+- The code examples call the real endpoints with each language's usual HTTP library. There is no Find.ly SDK: do not add `pip install` / `npm install` of a Find.ly package unless one is actually published.
 - The interactive playground is off (`"api.playground.display": "simple"`): it would send real keys through Mintlify's proxy and use real requests. Set it to `"interactive"` in `docs.json` if you want it.
-- No logo is set, so Mintlify shows the name "Find.ly API". To add one, put SVG or PNG files in `docs/logo/` and add `"logo": { "light": "/logo/light.svg", "dark": "/logo/dark.svg", "href": "https://findly.icu" }` and `"favicon": "/favicon.svg"` to `docs.json`.
+- Theme: `almond` (logo top left, search in the sidebar, tabs at the top, "On this page" on the right). Dark mode is the default; the light/dark toggle is kept, so the logo exists in both versions.
+- `same-tab.js` only touches links whose host is `findly.icu` or `www.findly.icu`. Every other external link keeps Mintlify's default (new tab).

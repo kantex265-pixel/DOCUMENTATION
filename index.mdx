@@ -1,41 +1,85 @@
 ---
-title: "Introduction"
-description: "Run Find.ly searches and exports from your own code: the same modules, quotas and limits as the dashboard."
+title: "Find.ly API Documentation"
+sidebarTitle: "Home"
+description: "Search leak and OSINT data from your own code: IntelX modules, raw files, stealer-log exports and Breach Search, with the same quotas and limits as the dashboard."
 ---
 
-The Find.ly API gives your scripts and servers the same searches as the [Find.ly dashboard](https://findly.icu/dashboard): leak records, selectors for a domain, raw files, stealer-log archives, and a person's records in our own breach index. It is a small JSON-over-HTTPS API with three endpoints.
+<img
+  src="/images/api-map.svg"
+  alt="The Find.ly API at /api/v1, linked to the IntelX Modules, Raw Files, Stealer Export, Breach Search and Usage."
+  className="findly-hero"
+  noZoom
+/>
+
+## Welcome to the Find.ly API
+
+The Find.ly API gives your scripts and servers the same searches as the [Find.ly dashboard](https://findly.icu/dashboard): leak records, selectors for a domain, raw files, stealer-log archives, and a person's records in our own breach index. It is a small JSON-over-HTTPS API with three endpoints, authenticated with one API key.
 
 <Note>
   API access comes with the **Professional** and **Enterprise** plans. Professional gives 500 IntelX requests and 800
   Breach Search requests a day; Enterprise gives 1,500 and 5,000. See [pricing](https://findly.icu/#pricing).
 </Note>
 
-## Base URL
+## Core capabilities
 
-```text
-https://findly.icu/api/v1
+<Columns cols={2}>
+  <Card title="IntelX Modules" icon="layer-group" href="/guides/modules#intelx-modules">
+    Intelligence Search, Phonebook and Identity Portal, powered by our search provider Intelligence X.
+  </Card>
+  <Card title="Breach Search" icon="database" href="/guides/modules#breach-search">
+    A free-text query, or combined fields, on the breach index Find.ly runs itself.
+  </Card>
+  <Card title="Raw files" icon="file-lines" href="/guides/raw-files">
+    Download the file behind a result by System ID or Storage ID, as JSON or plain text.
+  </Card>
+  <Card title="Stealer Export" icon="file-zipper" href="/guides/stealer-export">
+    Every stealer log attached to one System ID, as a single `.zip` archive.
+  </Card>
+</Columns>
+
+## Quick example
+
+Check your key and both of today's quotas. This call is free: it never runs a search and never uses a request.
+
+<CodeGroup>
+
+```bash cURL
+curl https://findly.icu/api/v1/usage \
+  -H "Authorization: Bearer $FINDLY_API_KEY"
 ```
 
-HTTPS only. Every response is sent with `Cache-Control: no-store`.
+```python Python
+import os
+import requests
 
-## Endpoints
+response = requests.get(
+    "https://findly.icu/api/v1/usage",
+    headers={"Authorization": f"Bearer {os.environ['FINDLY_API_KEY']}"},
+    timeout=60,
+)
+print(response.json())
+```
 
-| Method | Path | What it does | Billed |
-| --- | --- | --- | --- |
-| `GET` | `/api/v1/usage` | Plan, both of today's quotas and open modules | Never |
-| `POST` | `/api/v1/search/{module}` | One search in one module | 1 request when served |
-| `POST` | `/api/v1/stealer-export` | Every stealer log of one System ID, as a `.zip` | 1 request per export |
+```javascript Node.js
+const response = await fetch('https://findly.icu/api/v1/usage', {
+  headers: { Authorization: `Bearer ${process.env.FINDLY_API_KEY}` },
+});
+console.log(await response.json());
+```
 
-## Modules
+</CodeGroup>
 
-Find.ly serves its own modules, from two sources:
+```json Response
+{
+  "username": "acme-security",
+  "modules": ["intelligence-search", "phonebook", "identity-portal", "system-id", "storage-id", "breach-search", "stealer-export"],
+  "breach_usage": { "plan": "Professional", "plan_expires_at": "2026-10-16T12:00:00.000Z", "daily_quota": 800, "used": 3, "remaining": 797, "resets_at": "2026-09-17T00:00:00.000Z" },
+  "billed": false,
+  "usage": { "plan": "Professional", "plan_expires_at": "2026-10-16T12:00:00.000Z", "daily_quota": 500, "used": 12, "remaining": 488, "resets_at": "2026-09-17T00:00:00.000Z" }
+}
+```
 
-- **IntelX Modules**, powered by our search provider Intelligence X: `intelligence-search`, `phonebook`, `identity-portal`, `system-id`, `storage-id`, plus the Stealer Export archive.
-- **FindLy Module**: `breach-search`, which runs on a breach index Find.ly ingests and documents itself.
-
-`{module}` is one of the six search slugs above. See [Modules and inputs](/guides/modules).
-
-Stealer Export is **not** a search module: it answers with a file rather than JSON, so it has its own endpoint. See [Stealer Export](/guides/stealer-export).
+Your first search, a raw file download and a Breach Search lookup are in the [Quickstart](/quickstart).
 
 ## How it works
 
@@ -45,23 +89,40 @@ Stealer Export is **not** a search module: it answers with a file rather than JS
 - **Server-side only.** The API sends no CORS headers: browsers cannot read its responses. Call it from a server, a script or a terminal, never from a web page.
 - **Nothing is stored.** Results are sent back to you and not kept, so there is no server-side pagination: you get the whole list at once — up to 5,000 items from an IntelX module, up to 100 records from Breach Search. See [Pagination](/guides/pagination).
 
+## Modules
+
+Find.ly serves its own modules, from two sources:
+
+- **IntelX Modules**, powered by our search provider Intelligence X: `intelligence-search`, `phonebook`, `identity-portal`, `system-id`, `storage-id`, plus the Stealer Export archive.
+- **FindLy Module**: `breach-search`, which runs on a breach index Find.ly ingests and documents itself.
+
+Stealer Export is **not** a search module: it answers with a file rather than JSON, so it has its own endpoint. See [Modules and inputs](/guides/modules) and [Stealer Export](/guides/stealer-export).
+
+## Explore the docs
+
 <Columns cols={2}>
-  <Card title="Quickstart" icon="terminal" href="/quickstart">
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
     Your first calls in a minute, with curl.
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/overview">
+    Base URL, envelopes and every endpoint, generated from OpenAPI.
   </Card>
   <Card title="Authentication" icon="key" href="/authentication">
     Get your key and send it the right way.
   </Card>
+  <Card title="Code Examples" icon="terminal" href="/code-examples/overview">
+    Copy-paste calls in cURL, Python, JavaScript, Go and PHP.
+  </Card>
   <Card title="Modules and inputs" icon="layer-group" href="/guides/modules">
     Request bodies and responses for each module.
-  </Card>
-  <Card title="Breach Search" icon="database" href="/guides/modules#breach-search">
-    A free-text query, or combined fields, on our own index.
   </Card>
   <Card title="Errors" icon="triangle-exclamation" href="/guides/errors">
     Every error code, its status and what to do.
   </Card>
-  <Card title="Stealer Export" icon="file-zipper" href="/guides/stealer-export">
-    Pull every stealer log of a System ID as one archive.
-  </Card>
 </Columns>
+
+## Getting help
+
+- **Your key, plan and quotas**: [Dashboard → API](https://findly.icu/dashboard/api). `GET /api/v1/usage` gives the same numbers from code, for free.
+- **Something looks down**: the [status page](https://findly.icu/status) shows the state of each service and past incidents.
+- **Anything else**: [contact us](https://findly.icu/contact). Include the endpoint, the time of the call and the `error.code` you received — never your API key.

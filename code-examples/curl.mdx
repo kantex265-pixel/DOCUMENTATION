@@ -1,0 +1,157 @@
+---
+title: "cURL"
+icon: "terminal"
+description: "Call every Find.ly endpoint from a terminal or a shell script."
+---
+
+Every example reads your key from `FINDLY_API_KEY`:
+
+```bash
+export FINDLY_API_KEY="fly_live_XXXX"
+```
+
+## Check your key and quotas
+
+Free: never billed, never runs a search.
+
+```bash
+curl https://findly.icu/api/v1/usage \
+  -H "Authorization: Bearer $FINDLY_API_KEY"
+```
+
+`usage` is the IntelX request quota, `breach_usage` the Breach Search bucket. With [`jq`](https://jqlang.github.io/jq/), print what is left in each:
+
+```bash
+curl -s https://findly.icu/api/v1/usage \
+  -H "Authorization: Bearer $FINDLY_API_KEY" \
+  | jq '{intelx: .usage.remaining, breach: .breach_usage.remaining}'
+```
+
+## Intelligence Search
+
+```bash
+curl https://findly.icu/api/v1/search/intelligence-search \
+  -H "Authorization: Bearer $FINDLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "example.com", "max_results": 100, "sort_order": "date_desc"}'
+```
+
+Keep only the matching lines and their System IDs:
+
+```bash
+curl -s https://findly.icu/api/v1/search/intelligence-search \
+  -H "Authorization: Bearer $FINDLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "example.com"}' \
+  | jq -r '.results[] | [.system_id, .line] | @tsv'
+```
+
+## Phonebook as a text file
+
+`?format=txt` returns one selector per line, at the same price as JSON:
+
+```bash
+curl "https://findly.icu/api/v1/search/phonebook?format=txt" \
+  -H "Authorization: Bearer $FINDLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "email", "query": "@example.com"}' \
+  --fail-with-body \
+  -o emails.txt
+```
+
+An empty result is `204 No Content` with no body. `--fail-with-body` makes curl exit with an error on a `4xx` or `5xx`, so a JSON error is never mistaken for the list.
+
+## Identity Portal
+
+```bash
+curl https://findly.icu/api/v1/search/identity-portal \
+  -H "Authorization: Bearer $FINDLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "john.doe@example.com"}'
+```
+
+## Download a raw file
+
+Pass a result's `system_id`. With `?format=txt`, `-OJ` saves the file under the name from `Content-Disposition`:
+
+```bash
+curl "https://findly.icu/api/v1/search/system-id?format=txt" \
+  -H "Authorization: Bearer $FINDLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"}' \
+  --fail-with-body \
+  -OJ
+```
+
+By storage ID and bucket instead:
+
+```bash
+curl "https://findly.icu/api/v1/search/storage-id?format=txt" \
+  -H "Authorization: Bearer $FINDLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"storage_id": "<128 or 129 hexadecimal characters>", "bucket": "leaks.private.general"}' \
+  --fail-with-body \
+  -OJ
+```
+
+## Breach Search
+
+A single free-text value:
+
+```bash
+curl https://findly.icu/api/v1/search/breach-search \
+  -H "Authorization: Bearer $FINDLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "jane.doe@example.com"}'
+```
+
+Combined fields, all of which must match:
+
+```bash
+curl https://findly.icu/api/v1/search/breach-search \
+  -H "Authorization: Bearer $FINDLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"fields": {"city": "Paris", "last_name": "Dupont", "first_name": "Jean"}}'
+```
+
+## Stealer Export
+
+```bash
+curl https://findly.icu/api/v1/stealer-export \
+  -H "Authorization: Bearer $FINDLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"}' \
+  --fail-with-body \
+  -o stealer-export.zip
+```
+
+Without `--fail-with-body`, curl writes a JSON error into a file named `.zip`.
+
+## Handle errors and retries
+
+Save the body, then decide from the status code:
+
+```bash
+status=$(curl -s -o response.json -w "%{http_code}" \
+  https://findly.icu/api/v1/search/phonebook \
+  -H "Authorization: Bearer $FINDLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "domain", "query": "example.com"}')
+
+if [ "$status" = "200" ]; then
+  jq -r '.results[].selector' response.json
+else
+  jq -r '"\(.error.code): \(.error.message)"' response.json
+fi
+```
+
+On a `429`, wait the number of seconds in `Retry-After` before trying again. `-i` shows the headers:
+
+```bash
+curl -i https://findly.icu/api/v1/search/identity-portal \
+  -H "Authorization: Bearer $FINDLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "john.doe@example.com"}'
+```
+
+Every code and `429` reason is listed in [Errors](/guides/errors).

@@ -1,0 +1,222 @@
+---
+title: "PHP"
+icon: "php"
+description: "Call the Find.ly API from PHP 8.1 or newer with the curl extension."
+---
+
+There is no Find.ly package to install: these examples use the `curl` and `json` extensions that ship with PHP, and need PHP 8.1 or newer.
+
+```bash
+export FINDLY_API_KEY="fly_live_XXXX"
+php example.php
+```
+
+## A small helper
+
+Put this in `findly.php`. It sends the key, keeps the timeout above the 30-second search limit, and turns the error envelope into an exception.
+
+```php findly.php
+<?php
+
+const FINDLY_API = 'https://findly.icu/api/v1';
+
+final class FindlyException extends RuntimeException
+{
+    public function __construct(
+        public readonly int $status,
+        public readonly array $error,
+        public readonly int $retryAfter,
+    ) {
+        parent::__construct("{$status} {$error['code']}: {$error['message']}");
+    }
+}
+
+/**
+ * Sends one request. Returns ['status' => int, 'headers' => array, 'body' => string].
+ * Throws FindlyException on a 4xx or 5xx.
+ */
+function findly(string $path, ?array $body = null, array $query = []): array
+{
+    $url = FINDLY_API . $path . ($query ? '?' . http_build_query($query) : '');
+    $headers = [];
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        // Searches can take up to 30 seconds: keep the client timeout above that.
+        CURLOPT_TIMEOUT => 60,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . getenv('FINDLY_API_KEY'),
+            'Content-Type: application/json',
+        ],
+        CURLOPT_HEADERFUNCTION => function ($ch, string $line) use (&$headers): int {
+            $parts = explode(':', $line, 2);
+            if (count($parts) === 2) {
+                $headers[strtolower(trim($parts[0]))] = trim($parts[1]);
+            }
+            return strlen($line);
+        },
+    ]);
+    if ($body !== null) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body, JSON_THROW_ON_ERROR));
+    }
+
+    $raw = curl_exec($ch);
+    if ($raw === false) {
+        throw new RuntimeException('Network error: ' . curl_error($ch));
+    }
+    $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+
+    if ($status >= 400) {
+        $error = json_decode($raw, true)['error'] ?? ['code' => 'http_error', 'message' => "HTTP {$status}"];
+        throw new FindlyException($status, $error, (int) ($headers['retry-after'] ?? 0));
+    }
+    return ['status' => $status, 'headers' => $headers, 'body' => $raw];
+}
+
+/** Runs one search and returns the decoded JSON response. */
+function findly_search(string $module, array $body): array
+{
+    $response = findly("/search/{$module}", $body);
+    return json_decode($response['body'], true, 512, JSON_THROW_ON_ERROR);
+}
+```
+
+## Check your key and quotas
+
+Free: never billed, never runs a search.
+
+```php
+<?php
+require __DIR__ . '/findly.php';
+
+$me = json_decode(findly('/usage')['body'], true, 512, JSON_THROW_ON_ERROR);
+
+echo $me['username'], ' ', $me['usage']['plan'], PHP_EOL;
+echo 'IntelX requests left: ', $me['usage']['remaining'], PHP_EOL;
+echo 'Breach Search left: ', $me['breach_usage']['remaining'], PHP_EOL;
+```
+
+## Intelligence Search
+
+```php
+<?php
+require __DIR__ . '/findly.php';
+
+$body = findly_search('intelligence-search', [
+    'query' => 'example.com',
+    'max_results' => 100,
+    'sort_order' => 'date_desc',
+]);
+
+echo $body['total'], ' found, ', $body['returned'], ' returned', PHP_EOL;
+foreach ($body['results'] as $record) {
+    echo $record['date'] ?? '-', ' ', $record['system_id'] ?? '-', ' ', $record['line'] ?? '', PHP_EOL;
+}
+```
+
+## Phonebook as a text file
+
+`format=txt` returns one selector per line, at the same price as JSON. An empty result is `204 No Content`.
+
+```php
+<?php
+require __DIR__ . '/findly.php';
+
+$response = findly('/search/phonebook', ['type' => 'email', 'query' => '@example.com'], ['format' => 'txt']);
+
+if ($response['status'] === 204) {
+    echo 'Nothing found. Billed: ', $response['headers']['x-request-billed'], PHP_EOL;
+} else {
+    file_put_contents('emails.txt', $response['body']);
+    echo $response['headers']['x-results-total'], ' emails saved', PHP_EOL;
+}
+```
+
+## Download a raw file
+
+```php
+<?php
+require __DIR__ . '/findly.php';
+
+$body = findly_search('system-id', ['system_id' => '3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13']);
+
+if ($body['file'] === null) {
+    echo 'Empty or not found. Billed: ', var_export($body['billed'], true), PHP_EOL;
+} else {
+    file_put_contents($body['file']['name'], $body['file']['text']);
+    echo $body['file']['name'], ' ', $body['file']['bytes'], ' bytes', PHP_EOL;
+}
+```
+
+## Breach Search
+
+A single free-text value, or combined `fields` that must all match:
+
+```php
+<?php
+require __DIR__ . '/findly.php';
+
+$byEmail = findly_search('breach-search', ['query' => 'jane.doe@example.com']);
+
+$byPerson = findly_search('breach-search', [
+    'fields' => ['city' => 'Paris', 'last_name' => 'Dupont', 'first_name' => 'Jean'],
+]);
+
+foreach ($byPerson['results'] as $row) {
+    $source = $byPerson['sources'][$row['breach_id']] ?? [];
+    echo $source['name'] ?? '?', ': ', json_encode($row['record']), PHP_EOL;
+}
+echo 'Breach Search left: ', $byPerson['usage']['remaining'], PHP_EOL;
+```
+
+Columns in `record` vary from one breach to the next: read the keys you need and ignore the rest.
+
+## Stealer Export
+
+The archive is the body on success; errors are still JSON, and `findly()` throws them.
+
+```php
+<?php
+require __DIR__ . '/findly.php';
+
+$response = findly('/stealer-export', ['system_id' => '3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13']);
+
+file_put_contents('stealer-export.zip', $response['body']);
+echo strlen($response['body']), ' bytes, ', $response['headers']['x-quota-remaining'], ' requests left today', PHP_EOL;
+```
+
+## Handle errors and retries
+
+Branch on `code`, wait `Retry-After` on a `429`, and stop on `quota_exceeded`: the quota only comes back at 02:00 Paris time.
+
+```php
+<?php
+require __DIR__ . '/findly.php';
+
+function findly_search_with_retry(string $module, array $body, int $attempts = 3): array
+{
+    for ($attempt = 1; ; $attempt++) {
+        try {
+            return findly_search($module, $body);
+        } catch (FindlyException $e) {
+            if ($e->status !== 429 || $e->error['code'] === 'quota_exceeded' || $attempt === $attempts) {
+                throw $e;
+            }
+            sleep($e->retryAfter ?: 5);
+        }
+    }
+}
+
+try {
+    $result = findly_search_with_retry('phonebook', ['type' => 'domain', 'query' => 'example.com']);
+    foreach ($result['results'] as $item) {
+        echo $item['selector'], PHP_EOL;
+    }
+} catch (FindlyException $e) {
+    echo $e->getMessage(), PHP_EOL;                       // 422 invalid_input: Some fields are invalid. …
+    print_r($e->error['fields'] ?? []);                   // one message per invalid field
+}
+```
+
+Errors never use a request. The full list is in [Errors](/guides/errors).

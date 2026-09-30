@@ -1,0 +1,342 @@
+---
+title: "Go"
+icon: "golang"
+description: "Call the Find.ly API from Go with the standard library only."
+---
+
+There is no Find.ly module to install: these examples use `net/http` and `encoding/json` only, and need Go 1.18 or newer.
+
+```bash
+export FINDLY_API_KEY="fly_live_XXXX"
+go run .
+```
+
+## A small helper
+
+Put this in `findly.go`. It sends the key, keeps the timeout above the 30-second search limit, and turns the error envelope into a Go error.
+
+```go findly.go
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"strconv"
+	"time"
+)
+
+const api = "https://findly.icu/api/v1"
+
+// Searches can take up to 30 seconds: keep the client timeout above that.
+var client = &http.Client{Timeout: 60 * time.Second}
+
+// APIError is the "error" object of every error response.
+type APIError struct {
+	Status     int               `json:"-"`
+	RetryAfter int               `json:"-"`
+	Code       string            `json:"code"`
+	Message    string            `json:"message"`
+	Reason     string            `json:"reason,omitempty"`
+	Fields     map[string]string `json:"fields,omitempty"`
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("%d %s: %s", e.Status, e.Code, e.Message)
+}
+
+// call sends one request and returns the response with its body already read.
+// A 4xx or 5xx is returned as an *APIError.
+func call(method, path string, query url.Values, body any) (*http.Response, []byte, error) {
+	var reader io.Reader
+	if body != nil {
+		payload, err := json.Marshal(body)
+		if err != nil {
+			return nil, nil, err
+		}
+		reader = bytes.NewReader(payload)
+	}
+	target := api + path
+	if len(query) > 0 {
+		target += "?" + query.Encode()
+	}
+	req, err := http.NewRequest(method, target, reader)
+	if err != nil {
+		return nil, nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+os.Getenv("FINDLY_API_KEY"))
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer res.Body.Close()
+	data, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, nil, err
+	}
+	if res.StatusCode >= 400 {
+		var envelope struct {
+			Error APIError `json:"error"`
+		}
+		if err := json.Unmarshal(data, &envelope); err != nil {
+			return res, data, fmt.Errorf("HTTP %d", res.StatusCode)
+		}
+		envelope.Error.Status = res.StatusCode
+		envelope.Error.RetryAfter, _ = strconv.Atoi(res.Header.Get("Retry-After"))
+		return res, data, &envelope.Error
+	}
+	return res, data, nil
+}
+
+// search runs one search and decodes its JSON response into out.
+func search(module string, body, out any) error {
+	_, data, err := call(http.MethodPost, "/search/"+module, nil, body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, out)
+}
+
+// Quota is the "usage" and "breach_usage" object.
+type Quota struct {
+	Plan          string  `json:"plan"`
+	PlanExpiresAt *string `json:"plan_expires_at"`
+	DailyQuota    int     `json:"daily_quota"`
+	Used          int     `json:"used"`
+	Remaining     int     `json:"remaining"`
+	ResetsAt      string  `json:"resets_at"`
+}
+```
+
+## Check your key and quotas
+
+Free: never billed, never runs a search.
+
+```go
+func checkUsage() error {
+	_, data, err := call(http.MethodGet, "/usage", nil, nil)
+	if err != nil {
+		return err
+	}
+	var me struct {
+		Username    string   `json:"username"`
+		Modules     []string `json:"modules"`
+		Usage       Quota    `json:"usage"`
+		BreachUsage Quota    `json:"breach_usage"`
+	}
+	if err := json.Unmarshal(data, &me); err != nil {
+		return err
+	}
+	fmt.Println(me.Username, me.Usage.Plan)
+	fmt.Println("IntelX requests left:", me.Usage.Remaining)
+	fmt.Println("Breach Search left:", me.BreachUsage.Remaining)
+	return nil
+}
+```
+
+## Intelligence Search
+
+```go
+type Record struct {
+	Name      string  `json:"name"`
+	Date      *string `json:"date"`
+	Bucket    *string `json:"bucket"`
+	SizeBytes *int64  `json:"size_bytes"`
+	MediaType *string `json:"media_type"`
+	SystemID  *string `json:"system_id"`
+	Line      *string `json:"line"`
+}
+
+func intelligenceSearch() error {
+	var body struct {
+		Total    int      `json:"total"`
+		Returned int      `json:"returned"`
+		Results  []Record `json:"results"`
+		Billed   bool     `json:"billed"`
+	}
+	request := map[string]any{"query": "example.com", "max_results": 100, "sort_order": "date_desc"}
+	if err := search("intelligence-search", request, &body); err != nil {
+		return err
+	}
+	fmt.Println(body.Total, "found,", body.Returned, "returned, billed:", body.Billed)
+	for _, record := range body.Results {
+		if record.Line != nil {
+			fmt.Println(record.Name, *record.Line)
+		}
+	}
+	return nil
+}
+```
+
+## Phonebook as a text file
+
+`?format=txt` returns one selector per line, at the same price as JSON. An empty result is `204 No Content`.
+
+```go
+func phonebookText() error {
+	query := url.Values{"format": {"txt"}}
+	body := map[string]string{"type": "email", "query": "@example.com"}
+	res, data, err := call(http.MethodPost, "/search/phonebook", query, body)
+	if err != nil {
+		return err
+	}
+	if res.StatusCode == http.StatusNoContent {
+		fmt.Println("Nothing found. Billed:", res.Header.Get("X-Request-Billed"))
+		return nil
+	}
+	if err := os.WriteFile("emails.txt", data, 0o600); err != nil {
+		return err
+	}
+	fmt.Println(res.Header.Get("X-Results-Total"), "emails saved")
+	return nil
+}
+```
+
+## Download a raw file
+
+```go
+func downloadFile() error {
+	var body struct {
+		File *struct {
+			Name      string `json:"name"`
+			Bytes     int    `json:"bytes"`
+			Truncated bool   `json:"truncated"`
+			Text      string `json:"text"`
+		} `json:"file"`
+		Billed bool `json:"billed"`
+	}
+	request := map[string]string{"system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"}
+	if err := search("system-id", request, &body); err != nil {
+		return err
+	}
+	if body.File == nil {
+		fmt.Println("Empty or not found. Billed:", body.Billed)
+		return nil
+	}
+	fmt.Println(body.File.Name, body.File.Bytes, "bytes, cut at 8 MB:", body.File.Truncated)
+	return os.WriteFile(body.File.Name, []byte(body.File.Text), 0o600)
+}
+```
+
+## Breach Search
+
+A single free-text value, or combined `fields` that must all match:
+
+```go
+type BreachSource struct {
+	Name *string `json:"name"`
+	Site *string `json:"site"`
+	Date *string `json:"date"`
+}
+
+type BreachRow struct {
+	BreachID     string            `json:"breach_id"`
+	Record       map[string]string `json:"record"`
+	MaskedFields []string          `json:"masked_fields"`
+}
+
+func breachSearch() error {
+	var body struct {
+		Total   int                     `json:"total"`
+		Sources map[string]BreachSource `json:"sources"`
+		Results []BreachRow             `json:"results"`
+		Usage   Quota                   `json:"usage"`
+	}
+	request := map[string]any{
+		"fields": map[string]string{"city": "Paris", "last_name": "Dupont", "first_name": "Jean"},
+	}
+	// For a free-text lookup: map[string]any{"query": "jane.doe@example.com"}
+	if err := search("breach-search", request, &body); err != nil {
+		return err
+	}
+	for _, row := range body.Results {
+		if source, ok := body.Sources[row.BreachID]; ok && source.Name != nil {
+			fmt.Print(*source.Name, " ")
+		}
+		fmt.Println(row.Record, row.MaskedFields)
+	}
+	fmt.Println("Breach Search left:", body.Usage.Remaining)
+	return nil
+}
+```
+
+Columns in `record` vary from one breach to the next: read the keys you need and ignore the rest.
+
+## Stealer Export
+
+The archive is the body on success; errors are still JSON, and `call` returns them as an `*APIError`.
+
+```go
+func stealerExport() error {
+	body := map[string]string{"system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"}
+	res, data, err := call(http.MethodPost, "/stealer-export", nil, body)
+	if err != nil {
+		return err
+	}
+	fmt.Println(len(data), "bytes,", res.Header.Get("X-Quota-Remaining"), "requests left today")
+	return os.WriteFile("stealer-export.zip", data, 0o600)
+}
+```
+
+## Handle errors and retries
+
+Branch on `Code`, wait `Retry-After` on a `429`, and stop on `quota_exceeded`: the quota only comes back at 02:00 Paris time.
+
+```go main.go
+package main
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"time"
+)
+
+func searchWithRetry(module string, body, out any) error {
+	const attempts = 3
+	for attempt := 1; ; attempt++ {
+		err := search(module, body, out)
+		var apiErr *APIError
+		if err == nil || !errors.As(err, &apiErr) || apiErr.Status != 429 ||
+			apiErr.Code == "quota_exceeded" || attempt == attempts {
+			return err
+		}
+		wait := apiErr.RetryAfter
+		if wait == 0 {
+			wait = 5
+		}
+		time.Sleep(time.Duration(wait) * time.Second)
+	}
+}
+
+func main() {
+	var result struct {
+		Results []struct {
+			Selector string `json:"selector"`
+		} `json:"results"`
+	}
+	err := searchWithRetry("phonebook", map[string]string{"type": "domain", "query": "example.com"}, &result)
+
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		fmt.Println(apiErr)        // 422 invalid_input: Some fields are invalid. …
+		fmt.Println(apiErr.Fields) // one message per invalid field
+		os.Exit(1)
+	}
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	for _, item := range result.Results {
+		fmt.Println(item.Selector)
+	}
+}
+```
+
+Errors never use a request. The full list is in [Errors](/guides/errors).

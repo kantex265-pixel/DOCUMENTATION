@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "theme": "almond",
   "name": "Find.ly API",
   "description": "Search leak and OSINT data from your own code with the Find.ly API.",
   "colors": {
@@ -8,9 +8,15 @@
     "light": "#409cff",
     "dark": "#0a84ff"
   },
+  "logo": {
+    "light": "/logo/light.png",
+    "dark": "/logo/dark.png",
+    "href": "https://findly.icu"
+  },
+  "favicon": "/favicon.png",
   "appearance": {
     "default": "dark",
-    "strict": true
+    "strict": false
   },
   "background": {
     "color": {
@@ -18,11 +24,21 @@
       "dark": "#000000"
     }
   },
+  "fonts": {
+    "family": "Geist"
+  },
+  "search": {
+    "prompt": "Search the Find.ly docs..."
+  },
   "navbar": {
     "links": [
       {
         "label": "Website",
         "href": "https://findly.icu"
+      },
+      {
+        "label": "Dashboard",
+        "href": "https://findly.icu/dashboard"
       }
     ],
     "primary": {
@@ -32,47 +48,101 @@
     }
   },
   "navigation": {
-    "groups": [
+    "tabs": [
       {
-        "group": "Get started",
-        "pages": [
-          "index",
-          "authentication",
-          "quickstart"
-        ]
-      },
-      {
-        "group": "Guides",
-        "pages": [
-          "guides/modules",
-          "guides/billing-and-quotas",
-          "guides/rate-limits",
-          "guides/errors",
-          "guides/pagination",
-          "guides/raw-files",
-          "guides/stealer-export"
-        ]
-      },
-      {
-        "group": "API reference",
-        "openapi": "openapi.json",
-        "pages": [
-          "GET /api/v1/usage",
+        "tab": "Documentation",
+        "icon": "book-open",
+        "groups": [
           {
-            "group": "IntelX Modules",
+            "group": "Getting Started",
+            "icon": "rocket",
             "pages": [
-              "POST /api/v1/search/intelligence-search",
-              "POST /api/v1/search/phonebook",
-              "POST /api/v1/search/identity-portal",
-              "POST /api/v1/search/system-id",
-              "POST /api/v1/search/storage-id",
-              "POST /api/v1/stealer-export"
+              "index",
+              "quickstart",
+              "authentication"
             ]
           },
           {
-            "group": "FindLy Module",
+            "group": "Search Guides",
+            "icon": "magnifying-glass",
             "pages": [
-              "POST /api/v1/search/breach-search"
+              "guides/modules",
+              "guides/raw-files",
+              "guides/stealer-export",
+              "guides/pagination"
+            ]
+          },
+          {
+            "group": "Integration Guides",
+            "icon": "book",
+            "pages": [
+              "guides/billing-and-quotas",
+              "guides/rate-limits",
+              "guides/errors"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "icon": "code",
+        "groups": [
+          {
+            "group": "Overview",
+            "icon": "compass",
+            "pages": [
+              "api-reference/overview"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "icon": "plug",
+            "openapi": "openapi.json",
+            "pages": [
+              {
+                "group": "Account",
+                "expanded": true,
+                "pages": [
+                  "GET /api/v1/usage"
+                ]
+              },
+              {
+                "group": "IntelX Modules",
+                "expanded": true,
+                "pages": [
+                  "POST /api/v1/search/intelligence-search",
+                  "POST /api/v1/search/phonebook",
+                  "POST /api/v1/search/identity-portal",
+                  "POST /api/v1/search/system-id",
+                  "POST /api/v1/search/storage-id",
+                  "POST /api/v1/stealer-export"
+                ]
+              },
+              {
+                "group": "FindLy Module",
+                "expanded": true,
+                "pages": [
+                  "POST /api/v1/search/breach-search"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Code Examples",
+        "icon": "terminal",
+        "groups": [
+          {
+            "group": "Code Examples",
+            "icon": "brackets-curly",
+            "pages": [
+              "code-examples/overview",
+              "code-examples/curl",
+              "code-examples/python",
+              "code-examples/javascript",
+              "code-examples/go",
+              "code-examples/php"
             ]
           }
         ]
@@ -87,17 +157,69 @@
       "languages": [
         "bash",
         "python",
-        "javascript"
+        "javascript",
+        "go",
+        "php"
       ],
       "defaults": "required"
     }
   },
   "styling": {
+    "eyebrows": "section",
     "codeblocks": "dark"
   },
   "footer": {
     "socials": {
       "website": "https://findly.icu"
-    }
+    },
+    "links": [
+      {
+        "header": "Find.ly",
+        "items": [
+          {
+            "label": "Website",
+            "href": "https://findly.icu"
+          },
+          {
+            "label": "Dashboard",
+            "href": "https://findly.icu/dashboard"
+          },
+          {
+            "label": "All modules",
+            "href": "https://findly.icu/modules"
+          }
+        ]
+      },
+      {
+        "header": "Support",
+        "items": [
+          {
+            "label": "Status",
+            "href": "https://findly.icu/status"
+          },
+          {
+            "label": "Contact",
+            "href": "https://findly.icu/contact"
+          }
+        ]
+      },
+      {
+        "header": "Legal",
+        "items": [
+          {
+            "label": "Terms of Service",
+            "href": "https://findly.icu/terms"
+          },
+          {
+            "label": "Privacy Policy",
+            "href": "https://findly.icu/privacy"
+          },
+          {
+            "label": "Acceptable Use",
+            "href": "https://findly.icu/acceptable-use"
+          }
+        ]
+      }
+    ]
   }
 }

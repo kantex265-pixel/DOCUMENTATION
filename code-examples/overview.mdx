@@ -1,0 +1,50 @@
+---
+title: "Code Examples"
+sidebarTitle: "Overview"
+description: "Plain HTTP calls to the Find.ly API in cURL, Python, JavaScript, Go and PHP. No SDK to install."
+---
+
+The Find.ly API is plain JSON over HTTPS. There is **no official SDK or client package**: any HTTP client works, and every example in this tab calls the real endpoints directly with the language's usual HTTP library.
+
+<Columns cols={2}>
+  <Card title="cURL" icon="terminal" href="/code-examples/curl">
+    One-liners for the terminal and shell scripts.
+  </Card>
+  <Card title="Python" icon="python" href="/code-examples/python">
+    With `requests`: a small helper, then every module.
+  </Card>
+  <Card title="JavaScript" icon="js" href="/code-examples/javascript">
+    Node.js 18 or newer, with the built-in `fetch`.
+  </Card>
+  <Card title="Go" icon="golang" href="/code-examples/go">
+    Standard library only: `net/http` and `encoding/json`.
+  </Card>
+  <Card title="PHP" icon="php" href="/code-examples/php">
+    The `curl` extension and `json_decode`.
+  </Card>
+</Columns>
+
+## What every example assumes
+
+- **Your key is in an environment variable**, `FINDLY_API_KEY`. Copy it from [Dashboard → API](https://findly.icu/dashboard/api). Keep it out of your source code.
+
+  ```bash
+  export FINDLY_API_KEY="fly_live_XXXX"
+  ```
+
+- **Server-side only.** The API sends no CORS headers, so a browser cannot read its responses. Run these examples from a terminal, a script or your backend, never from a web page.
+- **A client timeout of 60 seconds.** An IntelX search can take up to 30 seconds before Find.ly gives up on it (20 for Breach Search). A shorter client timeout can give up on a search that is then billed.
+- **Errors are JSON, even with `?format=txt` or on Stealer Export.** Check the status code before you read or save the body, and branch on `error.code`.
+
+## What each example covers
+
+| Call | Endpoint | Quota |
+| --- | --- | --- |
+| Check the key and both quotas | `GET /api/v1/usage` | Free |
+| Search records | `POST /api/v1/search/intelligence-search` | 1 IntelX request |
+| List a domain's emails as text | `POST /api/v1/search/phonebook?format=txt` | 1 IntelX request |
+| Download a raw file | `POST /api/v1/search/system-id` | 1 IntelX request |
+| Look a person up | `POST /api/v1/search/breach-search` | 1 Breach Search request |
+| Download stealer logs as a `.zip` | `POST /api/v1/stealer-export` | 1 IntelX request |
+
+Request bodies, response fields and limits for each module are in [Modules and inputs](/guides/modules) and in the [API Reference](/api-reference/overview).

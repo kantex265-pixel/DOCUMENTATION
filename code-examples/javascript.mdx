@@ -1,0 +1,199 @@
+---
+title: "JavaScript"
+icon: "js"
+description: "Call the Find.ly API from Node.js 18 or newer with the built-in fetch."
+---
+
+There is no Find.ly package to install: Node.js 18 and newer ship `fetch`. The examples are ES modules (`.mjs` files, or `"type": "module"` in `package.json`) so they can use top-level `await`.
+
+```bash
+export FINDLY_API_KEY="fly_live_XXXX"
+node example.mjs
+```
+
+<Warning>
+  Run this code on a server, never in a browser. The API sends no CORS headers, and a key in front-end JavaScript is a
+  key anyone can read.
+</Warning>
+
+## A small helper
+
+Put this in `findly.mjs`. It sends the key, keeps the timeout above the 30-second search limit, and turns the error envelope into an exception.
+
+```javascript findly.mjs
+export const API = 'https://findly.icu/api/v1';
+
+export class FindlyError extends Error {
+  constructor(status, error, retryAfter) {
+    super(`${status} ${error.code}: ${error.message}`);
+    this.status = status;
+    this.code = error.code;
+    this.error = error;
+    this.retryAfter = retryAfter;
+  }
+}
+
+/** Sends one request. Returns the Response; throws FindlyError on a 4xx or 5xx. */
+export async function call(path, { body, format } = {}) {
+  const url = new URL(API + path);
+  if (format) url.searchParams.set('format', format);
+
+  const res = await fetch(url, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.FINDLY_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    // Searches can take up to 30 seconds: keep the client timeout above that.
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  if (!res.ok) {
+    const { error } = await res.json();
+    throw new FindlyError(res.status, error, Number(res.headers.get('Retry-After') ?? 0));
+  }
+  return res;
+}
+
+export const search = async (module, body) => (await call(`/search/${module}`, { body })).json();
+```
+
+## Check your key and quotas
+
+Free: never billed, never runs a search.
+
+```javascript
+import { call } from './findly.mjs';
+
+const me = await (await call('/usage')).json();
+console.log(me.username, me.usage.plan);
+console.log('IntelX requests left:', me.usage.remaining);
+console.log('Breach Search left:', me.breach_usage.remaining);
+```
+
+## Intelligence Search
+
+```javascript
+import { search } from './findly.mjs';
+
+const body = await search('intelligence-search', {
+  query: 'example.com',
+  max_results: 100,
+  sort_order: 'date_desc',
+});
+
+console.log(body.total, 'found,', body.returned, 'returned, billed:', body.billed);
+for (const record of body.results) {
+  console.log(record.date, record.bucket, record.system_id, record.line);
+}
+```
+
+## Phonebook as a text file
+
+`format: 'txt'` returns one selector per line, at the same price as JSON. An empty result is `204 No Content`.
+
+```javascript
+import { writeFile } from 'node:fs/promises';
+import { call } from './findly.mjs';
+
+const res = await call('/search/phonebook', {
+  body: { type: 'email', query: '@example.com' },
+  format: 'txt',
+});
+
+if (res.status === 204) {
+  console.log('Nothing found. Billed:', res.headers.get('X-Request-Billed'));
+} else {
+  await writeFile('emails.txt', await res.text());
+  console.log(res.headers.get('X-Results-Total'), 'emails saved');
+}
+```
+
+## Download a raw file
+
+```javascript
+import { writeFile } from 'node:fs/promises';
+import { search } from './findly.mjs';
+
+const body = await search('system-id', { system_id: '3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13' });
+
+if (body.file === null) {
+  console.log('Empty or not found. Billed:', body.billed);
+} else {
+  await writeFile(body.file.name, body.file.text);
+  console.log(body.file.name, body.file.bytes, 'bytes, cut at 8 MB:', body.file.truncated);
+}
+```
+
+## Breach Search
+
+A single free-text value, or combined `fields` that must all match:
+
+```javascript
+import { search } from './findly.mjs';
+
+const byEmail = await search('breach-search', { query: 'jane.doe@example.com' });
+
+const byPerson = await search('breach-search', {
+  fields: { city: 'Paris', last_name: 'Dupont', first_name: 'Jean' },
+});
+
+for (const row of byPerson.results) {
+  const source = byPerson.sources[row.breach_id];
+  console.log(source?.name, source?.date, row.record, row.masked_fields);
+}
+
+console.log('Breach Search left:', byPerson.usage.remaining);
+```
+
+Columns in `record` vary from one breach to the next: read the keys you need and ignore the rest.
+
+## Stealer Export
+
+The archive is the body on success; errors are still JSON, and `call` throws them.
+
+```javascript
+import { writeFile } from 'node:fs/promises';
+import { call } from './findly.mjs';
+
+const res = await call('/stealer-export', {
+  body: { system_id: '3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13' },
+});
+
+const archive = Buffer.from(await res.arrayBuffer());
+await writeFile('stealer-export.zip', archive);
+console.log(archive.length, 'bytes,', res.headers.get('X-Quota-Remaining'), 'requests left today');
+```
+
+## Handle errors and retries
+
+Branch on `code`, wait `Retry-After` on a `429`, and stop on `quota_exceeded`: the quota only comes back at 02:00 Paris time.
+
+```javascript
+import { setTimeout as sleep } from 'node:timers/promises';
+import { FindlyError, search } from './findly.mjs';
+
+async function searchWithRetry(module, body, attempts = 3) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await search(module, body);
+    } catch (err) {
+      const retryable = err instanceof FindlyError && err.status === 429 && err.code !== 'quota_exceeded';
+      if (!retryable || attempt === attempts) throw err;
+      await sleep((err.retryAfter || 5) * 1000);
+    }
+  }
+}
+
+try {
+  const result = await searchWithRetry('phonebook', { type: 'domain', query: 'example.com' });
+  console.log(result.results.map((item) => item.selector));
+} catch (err) {
+  if (!(err instanceof FindlyError)) throw err;
+  console.error(err.message);       // 422 invalid_input: Some fields are invalid. …
+  console.error(err.error.fields);  // one message per invalid field
+}
+```
+
+Errors never use a request. The full list is in [Errors](/guides/errors).

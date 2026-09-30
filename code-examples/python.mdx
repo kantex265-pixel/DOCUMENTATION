@@ -1,0 +1,190 @@
+---
+title: "Python"
+icon: "python"
+description: "Call the Find.ly API from Python with requests: a small helper, then every module."
+---
+
+There is no Find.ly package to install: these examples use [`requests`](https://requests.readthedocs.io/).
+
+```bash
+pip install requests
+export FINDLY_API_KEY="fly_live_XXXX"
+```
+
+## A small helper
+
+Put this in `findly.py`. It sends the key, keeps the timeout above the 30-second search limit, and turns the error envelope into an exception.
+
+```python findly.py
+import os
+
+import requests
+
+API = "https://findly.icu/api/v1"
+
+session = requests.Session()
+session.headers["Authorization"] = f"Bearer {os.environ['FINDLY_API_KEY']}"
+
+# Searches can take up to 30 seconds: keep the client timeout above that.
+TIMEOUT = 60
+
+
+class FindlyError(Exception):
+    def __init__(self, response):
+        error = response.json()["error"]
+        super().__init__(f"{response.status_code} {error['code']}: {error['message']}")
+        self.status = response.status_code
+        self.code = error["code"]
+        self.error = error
+        self.retry_after = int(response.headers.get("Retry-After", "0"))
+
+
+def get(path):
+    response = session.get(f"{API}{path}", timeout=TIMEOUT)
+    if not response.ok:
+        raise FindlyError(response)
+    return response.json()
+
+
+def post(path, body, fmt=None):
+    """POST a JSON body. Returns the parsed JSON, or the raw response when fmt="txt"."""
+    params = {"format": fmt} if fmt else None
+    response = session.post(f"{API}{path}", json=body, params=params, timeout=TIMEOUT)
+    if not response.ok:
+        raise FindlyError(response)
+    return response if fmt else response.json()
+```
+
+## Check your key and quotas
+
+Free: never billed, never runs a search.
+
+```python
+from findly import get
+
+me = get("/usage")
+print(me["username"], me["usage"]["plan"])
+print("IntelX requests left:", me["usage"]["remaining"])
+print("Breach Search left:", me["breach_usage"]["remaining"])
+```
+
+## Intelligence Search
+
+```python
+from findly import post
+
+body = post("/search/intelligence-search", {
+    "query": "example.com",
+    "max_results": 100,
+    "sort_order": "date_desc",
+})
+
+print(body["total"], "found,", body["returned"], "returned, billed:", body["billed"])
+for record in body["results"]:
+    print(record["date"], record["bucket"], record["system_id"], record["line"])
+```
+
+## Phonebook as a text file
+
+`fmt="txt"` returns one selector per line, at the same price as JSON. An empty result is `204 No Content`.
+
+```python
+from findly import post
+
+response = post("/search/phonebook", {"type": "email", "query": "@example.com"}, fmt="txt")
+
+if response.status_code == 204:
+    print("Nothing found. Billed:", response.headers["X-Request-Billed"])
+else:
+    with open("emails.txt", "w", encoding="utf-8") as out:
+        out.write(response.text)
+    print(response.headers["X-Results-Total"], "emails saved")
+```
+
+## Download a raw file
+
+```python
+from findly import post
+
+body = post("/search/system-id", {"system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"})
+
+file = body["file"]
+if file is None:
+    print("Empty or not found. Billed:", body["billed"])
+else:
+    with open(file["name"], "w", encoding="utf-8") as out:
+        out.write(file["text"])
+    print(file["name"], file["bytes"], "bytes, cut at 8 MB:", file["truncated"])
+```
+
+## Breach Search
+
+A single free-text value, or combined `fields` that must all match:
+
+```python
+from findly import post
+
+by_email = post("/search/breach-search", {"query": "jane.doe@example.com"})
+
+by_person = post("/search/breach-search", {
+    "fields": {"city": "Paris", "last_name": "Dupont", "first_name": "Jean"},
+})
+
+for row in by_person["results"]:
+    source = by_person["sources"].get(row["breach_id"], {})
+    print(source.get("name"), source.get("date"), row["record"], row["masked_fields"])
+
+print("Breach Search left:", by_person["usage"]["remaining"])
+```
+
+Columns in `record` vary from one breach to the next: read the keys you need and ignore the rest.
+
+## Stealer Export
+
+The archive is the body on success; errors are still JSON.
+
+```python
+from findly import FindlyError, session, API, TIMEOUT
+
+response = session.post(
+    f"{API}/stealer-export",
+    json={"system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13"},
+    timeout=TIMEOUT,
+)
+if not response.ok:
+    raise FindlyError(response)
+
+with open("stealer-export.zip", "wb") as out:
+    out.write(response.content)
+print(len(response.content), "bytes,", response.headers["X-Quota-Remaining"], "requests left today")
+```
+
+## Handle errors and retries
+
+Branch on `code`, wait `Retry-After` on a `429`, and stop on `quota_exceeded`: the quota only comes back at 02:00 Paris time.
+
+```python
+import time
+
+from findly import FindlyError, post
+
+
+def search(module, body, attempts=3):
+    for attempt in range(attempts):
+        try:
+            return post(f"/search/{module}", body)
+        except FindlyError as err:
+            if err.status != 429 or err.code == "quota_exceeded" or attempt == attempts - 1:
+                raise
+            time.sleep(err.retry_after or 5)
+
+
+try:
+    result = search("phonebook", {"type": "domain", "query": "example.com"})
+    print([item["selector"] for item in result["results"]])
+except FindlyError as err:
+    print(err)                              # 422 invalid_input: Some fields are invalid. …
+    print(err.error.get("fields"))          # one message per invalid field
+```
+
+Errors never use a request. The full list is in [Errors](/guides/errors).

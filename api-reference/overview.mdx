@@ -1,0 +1,166 @@
+---
+title: "API Reference Overview"
+sidebarTitle: "Overview"
+description: "How the Find.ly API is organized, with the exact endpoint contracts generated from OpenAPI."
+---
+
+## Base URL
+
+All API requests are made to:
+
+```text
+https://findly.icu/api/v1
+```
+
+HTTPS only. Every response is sent with `Cache-Control: no-store`.
+
+## Authentication
+
+Every endpoint needs your API key, in the `Authorization` header (recommended) or in `X-API-Key`:
+
+```bash
+curl https://findly.icu/api/v1/usage \n  -H "Authorization: Bearer fly_live_XXXX"
+```
+
+Never put the key in the URL: a `key`, `api_key`, `apikey`, `token` or `access_token` query parameter is refused with `400 api_key_in_url`. See [Authentication](/authentication).
+
+<a className="findly-link-card" href="https://findly.icu/dashboard/api">
+  <Icon icon="key" size={22} color="#409cff" />
+  <span className="findly-link-card-title">Get your API key</span>
+  <span className="findly-link-card-text">Open Dashboard → API to copy your key, or regenerate it.</span>
+</a>
+
+## API families
+
+| Method | Path | What it does | Billed |
+| --- | --- | --- | --- |
+| `GET` | `/api/v1/usage` | Plan, both of today's quotas and open modules | Never |
+| `POST` | `/api/v1/search/{module}` | One search in one module | 1 request when served |
+| `POST` | `/api/v1/stealer-export` | Every stealer log of one System ID, as a `.zip` | 1 request per export |
+
+`{module}` is one of six search slugs, grouped in this reference as:
+
+- **IntelX Modules**, powered by our search provider Intelligence X: `intelligence-search`, `phonebook`, `identity-portal`, `system-id`, `storage-id` — plus Stealer Export, which has its own endpoint because it answers with a file.
+- **FindLy Module**: `breach-search`, on the breach index Find.ly runs itself, with its own daily quota.
+
+All six search pages of this reference are the same route; each has its own page because each module takes a different body and returns a different shape. See [Modules and inputs](/guides/modules).
+
+## Requests
+
+- Searches and exports are `POST` with a **JSON object** body of **16 KB or less**. `Content-Type: application/json` is recommended but not required.
+- **Unknown fields are rejected** with `422 invalid_input`, so a typo is reported instead of ignored.
+- The only query parameter the API reads is `format`: `?format=txt` on Phonebook, System ID and Storage ID. Other parameters are ignored, except key-like ones, which are refused (see above). See [Raw files and text output](/guides/raw-files).
+- A method an endpoint does not support (for example `GET` on a search) returns `405 Method Not Allowed`.
+
+## Success responses
+
+### Envelope example
+
+A successful search returns JSON with `module`, the results, `billed` and `usage` — the quota the call drew from, after the call:
+
+```json
+{
+  "module": "intelligence-search",
+  "query": "example.com",
+  "total": 1,
+  "returned": 1,
+  "truncated": false,
+  "results": [
+    {
+      "name": "combolist_2024_part3.txt",
+      "date": "2024-03-18T09:41:07.000Z",
+      "date_raw": "2024-03-18 09:41:07",
+      "bucket": "leaks.private.general",
+      "size_bytes": 48213,
+      "media_type": "Text file",
+      "system_id": "3f0c6e1a-9b2d-4c7e-8f41-2a6d5b9e0c13",
+      "line": "john.doe@example.com:…",
+      "line_clipped": false
+    }
+  ],
+  "billed": true,
+  "usage": {
+    "plan": "Professional",
+    "plan_expires_at": "2026-10-16T12:00:00.000Z",
+    "daily_quota": 500,
+    "used": 13,
+    "remaining": 487,
+    "resets_at": "2026-09-17T00:00:00.000Z"
+  }
+}
+```
+
+The same facts travel in headers, on JSON and text responses alike:
+
+```http
+X-Request-Billed: true
+X-Quota-Limit: 500
+X-Quota-Remaining: 487
+X-Quota-Reset: 2026-09-17T00:00:00.000Z
+```
+
+### Plain text example
+
+With `?format=txt`, the same search returns a `text/plain; charset=utf-8` attachment at the same price. An empty result is `204 No Content`.
+
+```http
+HTTP/1.1 200 OK
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: attachment; filename="phonebook-email-example.com.txt"
+X-Request-Billed: true
+X-Results-Total: 2
+X-Results-Truncated: false
+
+john.doe@example.com
+jane@example.com
+```
+
+### File example
+
+`POST /api/v1/stealer-export` answers with the archive itself (`Content-Type: application/zip`). See [Stealer Export](/guides/stealer-export).
+
+## Error handling
+
+Every error has the same JSON shape, and **no error uses a request**:
+
+```json
+{
+  "error": {
+    "code": "invalid_input",
+    "message": "Some fields are invalid. No request was used.",
+    "fields": { "query": "For emails, enter a domain starting with @ — for example @openai.com." }
+  },
+  "billed": false
+}
+```
+
+| Status | Typical `code` | What to do |
+| --- | --- | --- |
+| 400 | `invalid_json`, `unsupported_format`, `api_key_in_url` | Fix the request |
+| 401 | `missing_api_key`, `invalid_api_key` | Send the current key |
+| 403 | `plan_required`, `module_locked`, `account_suspended` | Upgrade, renew or contact support |
+| 404 | `unknown_module`, `not_found` | Check the URL or the module slug. On an export, no logs were found: the request was given back |
+| 413 | `body_too_large` | Send a body of 16 KB or less |
+| 422 | `invalid_input` | Fix the fields listed in `error.fields` |
+| 429 | `too_many_requests`, `rate_limited`, `quota_exceeded` | Wait `Retry-After` seconds, or the daily reset |
+| 500 | `internal_error` | Retry later |
+| 502 | `upstream_error` | Retry in a minute; the request was refunded |
+
+Branch on `error.code`, never on `message`. The full list, with every `429` reason, is in [Errors](/guides/errors).
+
+## Quotas and plans
+
+| Plan | IntelX requests per day | Breach Search per day |
+| --- | --- | --- |
+| **Professional** | 500 | 800 |
+| **Enterprise** | 1,500 | 5,000 |
+
+- IntelX modules and Stealer Export draw from the IntelX quota; Breach Search from its own bucket. Spending one never touches the other.
+- Both reset every day at **02:00 Europe/Paris**. The dashboard and the API share them.
+- Per account: 2 searches running at once and 20 per minute, IntelX and Breach Search together. Per IP address: 60 API calls per minute.
+
+See [Billing and quotas](/guides/billing-and-quotas) and [Rate limits](/guides/rate-limits).
+
+## OpenAPI specification
+
+The endpoint pages of this reference are generated from an OpenAPI 3.1 file: [`openapi.json`](https://docs.findly.icu/openapi.json). Import it into your HTTP client or code generator to get every request body, response schema and error code.

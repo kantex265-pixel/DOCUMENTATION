@@ -1,0 +1,102 @@
+/*
+ * Find.ly look for the Mintlify docs. Mintlify loads every .css file of this
+ * folder on every page. Tokens come from the site (site/src/app/globals.css):
+ * black background, brand blue #0a84ff / #409cff, Geist, fine translucent
+ * borders, 12px radius. No heavy glows.
+ */
+@import url("https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap");
+
+:root {
+  --findly-blue: #0a84ff;
+  --findly-blue-light: #409cff;
+  --findly-radius: 12px;
+  --findly-border: rgba(9, 9, 11, 0.1);
+  --findly-border-hover: rgba(10, 132, 255, 0.55);
+  --findly-surface: #ffffff;
+  --findly-muted: #52525b;
+}
+
+html.dark {
+  --findly-border: rgba(255, 255, 255, 0.08);
+  --findly-border-hover: rgba(64, 156, 255, 0.5);
+  --findly-surface: rgba(255, 255, 255, 0.02);
+  --findly-muted: #a1a1aa;
+}
+
+::selection {
+  background: rgba(10, 132, 255, 0.45);
+  color: #fff;
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Cards: thin translucent border, 12px radius, flat surface. */
+.card {
+  border-radius: var(--findly-radius) !important;
+  border-color: var(--findly-border) !important;
+  background: var(--findly-surface) !important;
+  box-shadow: none !important;
+  transition: border-color 150ms ease;
+}
+
+.card:hover {
+  border-color: var(--findly-border-hover) !important;
+}
+
+/* Code blocks, callouts, tabs and accordions share the same frame. */
+.code-block,
+.code-group,
+.callout,
+.accordion {
+  border-radius: var(--findly-radius) !important;
+}
+
+/* Home illustration. */
+img.findly-hero {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0.5rem 0 1.5rem;
+  border-radius: var(--findly-radius);
+}
+
+/* Link card to the site (a plain <a>, so it opens in the same tab). */
+a.findly-link-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 1.25rem 0;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--findly-border);
+  border-radius: var(--findly-radius);
+  background: var(--findly-surface);
+  text-decoration: none !important;
+  border-bottom-width: 1px !important;
+  transition: border-color 150ms ease;
+}
+
+a.findly-link-card:hover {
+  border-color: var(--findly-border-hover);
+}
+
+a.findly-link-card .findly-link-card-title {
+  margin-top: 0.5rem;
+  font-weight: 600 !important;
+  font-size: 1rem;
+}
+
+a.findly-link-card .findly-link-card-text {
+  font-size: 0.95rem;
+  font-weight: 400 !important;
+  color: var(--findly-muted) !important;
+}
+
+/* Links to findly.icu behave like links of the site: same tab, no "external" arrow (see same-tab.js). */
+a[data-findly-same-tab] .findly-external-icon {
+  display: none !important;
+}
