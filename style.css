@@ -100,3 +100,44 @@ a.findly-link-card .findly-link-card-text {
 a[data-findly-same-tab] .findly-external-icon {
   display: none !important;
 }
+
+/*
+ * Page layout (xl and up): the text column was capped at 36rem (Mintlify's
+ * max-w-xl) and the "On this page" column sat right next to it, both centred.
+ * The text now takes up to 52rem, centred in the free space, and "On this
+ * page" is pushed to the right edge.
+ */
+@media (min-width: 1280px) {
+  #content-container > div:first-child {
+    justify-content: space-between;
+    max-width: none;
+  }
+
+  #content-area {
+    flex: 1 1 auto;
+    max-width: 52rem;
+    margin-inline: auto;
+  }
+}
+
+/* Laptop widths (1280-1535px): less padding and a slimmer "On this page", so the text keeps ~45rem. */
+@media (min-width: 1280px) and (max-width: 1535px) {
+  #content-container {
+    padding-left: 2.5rem !important;
+    padding-right: 2.5rem !important;
+  }
+
+  #content-container > div:first-child {
+    padding-left: 0 !important;
+    column-gap: 2.5rem;
+  }
+
+  #table-of-contents-layout {
+    width: 14rem;
+    padding-left: 0;
+  }
+
+  #table-of-contents {
+    width: 14rem;
+  }
+}
