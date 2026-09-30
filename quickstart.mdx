@@ -3,7 +3,7 @@ title: "Quickstart"
 description: "Check your key and quotas, run a search, download a raw file and look a person up in Breach Search, with curl."
 ---
 
-You need a Professional or Enterprise plan and your key from [Dashboard → API](https://findly.icu/dashboard/api). The examples use `fly_live_XXXX`: replace it with your key.
+You need a Professional or Enterprise plan and your key from [Dashboard → API](https://findly.icu/dashboard/api). On Starter, the key only works for the quota check and the Breach Search step; the other searches return `403 plan_required`. The examples use `fly_live_XXXX`: replace it with your key.
 
 <Steps>
   <Step title="Store your key">
@@ -33,9 +33,9 @@ You need a Professional or Enterprise plan and your key from [Dashboard → API]
       "breach_usage": {
         "plan": "Professional",
         "plan_expires_at": "2026-10-16T12:00:00.000Z",
-        "daily_quota": 800,
+        "daily_quota": 2000,
         "used": 3,
-        "remaining": 797,
+        "remaining": 1997,
         "resets_at": "2026-09-17T00:00:00.000Z"
       },
       "billed": false,
@@ -156,15 +156,15 @@ You need a Professional or Enterprise plan and your key from [Dashboard → API]
       "usage": {
         "plan": "Professional",
         "plan_expires_at": "2026-10-16T12:00:00.000Z",
-        "daily_quota": 800,
+        "daily_quota": 2000,
         "used": 4,
-        "remaining": 796,
+        "remaining": 1996,
         "resets_at": "2026-09-17T00:00:00.000Z"
       }
     }
     ```
 
-    Here `usage` is the **Breach Search** bucket (800 a day on Professional), not the IntelX quota. See
+    Here `usage` is the **Breach Search** bucket (2,000 a day on Professional), not the IntelX quota. See
     [Breach Search](/guides/modules#breach-search).
   </Step>
 </Steps>

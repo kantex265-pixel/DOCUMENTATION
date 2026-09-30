@@ -9,8 +9,9 @@ description: "Search leak and OSINT data from your own code: IntelX modules, raw
 The Find.ly API gives your scripts and servers the same searches as the [Find.ly dashboard](https://findly.icu/dashboard): leak records, selectors for a domain, raw files, stealer-log archives, and a person's records in our own breach index. It is a small JSON-over-HTTPS API with three endpoints, authenticated with one API key.
 
 <Note>
-  API access comes with the **Professional** and **Enterprise** plans. Professional gives 500 IntelX requests and 800
-  Breach Search requests a day; Enterprise gives 1,500 and 5,000. See [pricing](https://findly.icu/#pricing).
+  Full API access comes with the **Professional** and **Enterprise** plans. Professional gives 500 IntelX requests and
+  2,000 Breach Search requests a day; Enterprise gives 1,500 and 5,000. **Starter** has API access to Breach Search only,
+  with 500 Breach Search requests a day. See [pricing](https://findly.icu/#pricing).
 </Note>
 
 ## Core capabilities
@@ -66,7 +67,7 @@ console.log(await response.json());
 {
   "username": "acme-security",
   "modules": ["intelligence-search", "phonebook", "identity-portal", "system-id", "storage-id", "breach-search", "stealer-export"],
-  "breach_usage": { "plan": "Professional", "plan_expires_at": "2026-10-16T12:00:00.000Z", "daily_quota": 800, "used": 3, "remaining": 797, "resets_at": "2026-09-17T00:00:00.000Z" },
+  "breach_usage": { "plan": "Professional", "plan_expires_at": "2026-10-16T12:00:00.000Z", "daily_quota": 2000, "used": 3, "remaining": 1997, "resets_at": "2026-09-17T00:00:00.000Z" },
   "billed": false,
   "usage": { "plan": "Professional", "plan_expires_at": "2026-10-16T12:00:00.000Z", "daily_quota": 500, "used": 12, "remaining": 488, "resets_at": "2026-09-17T00:00:00.000Z" }
 }

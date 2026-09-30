@@ -19,7 +19,8 @@ HTTPS only. Every response is sent with `Cache-Control: no-store`.
 Every endpoint needs your API key, in the `Authorization` header (recommended) or in `X-API-Key`:
 
 ```bash
-curl https://findly.icu/api/v1/usage \n  -H "Authorization: Bearer fly_live_XXXX"
+curl https://findly.icu/api/v1/usage \
+  -H "Authorization: Bearer fly_live_XXXX"
 ```
 
 Never put the key in the URL: a `key`, `api_key`, `apikey`, `token` or `access_token` query parameter is refused with `400 api_key_in_url`. See [Authentication](/authentication).
@@ -150,11 +151,13 @@ Branch on `error.code`, never on `message`. The full list, with every `429` reas
 
 ## Quotas and plans
 
-| Plan | IntelX requests per day | Breach Search per day |
-| --- | --- | --- |
-| **Professional** | 500 | 800 |
-| **Enterprise** | 1,500 | 5,000 |
+| Plan | API access | IntelX requests per day | Breach Search per day |
+| --- | --- | --- | --- |
+| Starter | Breach Search only | 100 (dashboard only) | 500 |
+| **Professional** | Full | 500 | 2,000 |
+| **Enterprise** | Full | 1,500 | 5,000 |
 
+- Free has no API access. On Starter, the key only opens `POST /api/v1/search/breach-search` and `GET /api/v1/usage`; any other search module returns `403 plan_required`.
 - IntelX modules and Stealer Export draw from the IntelX quota; Breach Search from its own bucket. Spending one never touches the other.
 - Both reset every day at **02:00 Europe/Paris**. The dashboard and the API share them.
 - Per account: 2 searches running at once and 20 per minute, IntelX and Breach Search together. Per IP address: 60 API calls per minute.

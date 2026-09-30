@@ -104,7 +104,7 @@ The docs describe what the code does. When one of these changes, update the docs
 | `lib/public-api/search.ts` (fields, formats, response shapes) | `guides/modules.mdx`, `guides/raw-files.mdx`, `api-reference/overview.mdx`, `openapi.json`, `code-examples/*` |
 | `lib/intelx/validate.ts`, `lib/intelx/catalog.ts` (input rules, buckets) | `guides/modules.mdx`, `openapi.json` |
 | `lib/search.ts` (billing, refunds, per-account limits) | `guides/billing-and-quotas.mdx`, `guides/rate-limits.mdx`, `api-reference/overview.mdx` |
-| `lib/plan-rules.ts`, `lib/site.ts` (quotas, modules, `apiAccess`) | `index.mdx`, `api-reference/overview.mdx`, `guides/billing-and-quotas.mdx` |
+| `lib/plan-rules.ts`, `lib/site.ts`, `lib/plan-access.ts` (quotas, modules, `apiAccess`, Starter's Breach-Search-only API access) | `index.mdx`, `quickstart.mdx`, `authentication.mdx`, `api-reference/overview.mdx`, `guides/billing-and-quotas.mdx`, `guides/modules.mdx`, `guides/errors.mdx`, `openapi.json` |
 | `lib/breachdb/*` (Breach Search input, advanced fields, limits) | `guides/modules.mdx` (FindLy Module), `guides/rate-limits.mdx`, `guides/pagination.mdx`, `openapi.json`, `code-examples/*` (Breach Search) |
 | `app/api/v1/usage/route.ts` (`usage`, `breach_usage`) | `index.mdx`, `authentication.mdx`, `quickstart.mdx`, `guides/billing-and-quotas.mdx`, `openapi.json`, `code-examples/*` |
 | `app/api/v1/stealer-export/route.ts` (archive, headers) | `guides/stealer-export.mdx`, `openapi.json`, `code-examples/*` (Stealer Export) |

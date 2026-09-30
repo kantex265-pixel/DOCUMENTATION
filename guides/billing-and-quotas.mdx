@@ -12,16 +12,16 @@ Every account has **two daily quotas**, and spending one never touches the other
 
 | Plan | API access | IntelX requests per day | Breach Search per day | Modules |
 | --- | --- | --- | --- | --- |
-| Free | No | 3 | — | System ID, Storage ID |
-| Starter | No | 100 | 100 | Intelligence Search, System ID, Storage ID, Breach Search |
-| **Professional** | **Yes** | **500** | **800** | Every module, plus Stealer Export |
+| Free | No | 3 | 3 | System ID, Storage ID, Breach Search |
+| Starter | Breach Search only | 100 | 500 | Intelligence Search, System ID, Storage ID, Breach Search |
+| **Professional** | **Yes** | **500** | **2,000** | Every module, plus Stealer Export |
 | **Enterprise** | **Yes** | **1,500** | **5,000** | Every module, plus Stealer Export |
 
 - Both quotas reset every day at **02:00 Europe/Paris** time. `resets_at` gives the exact instant.
 - Quotas belong to the account: searches in the dashboard and through the API draw from the same two pools.
 - Unused requests do not carry over.
 - Plans last for the period you bought and do not renew automatically. When a plan ends, the account is back on Free and the API answers `403 plan_required`.
-- Only Professional and Enterprise hold API keys: on Starter, both quotas are used from the dashboard.
+- Professional and Enterprise have full API access. Starter's key only opens `POST /api/v1/search/breach-search` (and the free `GET /api/v1/usage`): its IntelX quota is used from the dashboard, and any other module called with its key returns `403 plan_required`. Free has no API access.
 
 ## What uses a request
 
@@ -103,7 +103,7 @@ X-Quota-Reset: 2026-09-17T00:00:00.000Z
 | `remaining` | Requests left today in this quota |
 | `resets_at` | Next reset (02:00 Europe/Paris) |
 
-On a `breach-search` response, `usage` and `X-Quota-*` describe the Breach Search bucket, so `daily_quota` is 800 or 5,000 where an IntelX search on the same key shows 500 or 1,500.
+On a `breach-search` response, `usage` and `X-Quota-*` describe the Breach Search bucket, so `daily_quota` is 500 on Starter, 2,000 on Professional and 5,000 on Enterprise, where an IntelX search on a Professional or Enterprise key shows 500 or 1,500.
 
 `usage` and `X-Quota-*` are present on `GET /api/v1/usage`, on served searches, and on `plan_required`, `module_locked`, `unknown_module`, `quota_exceeded`, `upstream_error` and the `refund-cap` refusal. They are absent on the other errors (authentication, `too_many_requests`, other `rate_limited` reasons, body and input errors, `internal_error`), which are returned before the quota is read.
 
@@ -119,13 +119,15 @@ curl https://findly.icu/api/v1/usage -H "Authorization: Bearer fly_live_XXXX"
 {
   "username": "acme-security",
   "modules": ["intelligence-search", "phonebook", "identity-portal", "system-id", "storage-id", "breach-search", "stealer-export"],
-  "breach_usage": { "plan": "Professional", "plan_expires_at": "2026-10-16T12:00:00.000Z", "daily_quota": 800, "used": 3, "remaining": 797, "resets_at": "2026-09-17T00:00:00.000Z" },
+  "breach_usage": { "plan": "Professional", "plan_expires_at": "2026-10-16T12:00:00.000Z", "daily_quota": 2000, "used": 3, "remaining": 1997, "resets_at": "2026-09-17T00:00:00.000Z" },
   "billed": false,
   "usage": { "plan": "Professional", "plan_expires_at": "2026-10-16T12:00:00.000Z", "daily_quota": 500, "used": 12, "remaining": 488, "resets_at": "2026-09-17T00:00:00.000Z" }
 }
 ```
 
 The `X-Quota-*` headers of this call describe the IntelX quota.
+
+On Starter, the call works too: `modules` lists the modules the plan opens in the dashboard (`intelligence-search`, `system-id`, `storage-id`, `breach-search`), but through the API only `breach-search` answers — watch `breach_usage`.
 
 ## When a quota runs out
 

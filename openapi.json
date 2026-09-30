@@ -3,7 +3,7 @@
   "info": {
     "title": "Find.ly API",
     "version": "1.0.0",
-    "description": "Search leak and OSINT data from your own code with the same modules, quota and limits as the Find.ly dashboard. API access comes with the Professional and Enterprise plans.\n\nFind.ly serves its own modules. Most are powered by our search provider, Intelligence X — `intelligence-search`, `phonebook`, `identity-portal`, `system-id`, `storage-id` and the Stealer Export archive. `breach-search` is ours: it runs on a breach index Find.ly ingests and documents itself, on its own separate daily quota.\n\nEvery search is `POST /api/v1/search/{module}`. Each module has its own reference page below because each takes a different body."
+    "description": "Search leak and OSINT data from your own code with the same modules, quota and limits as the Find.ly dashboard. Full API access comes with the Professional and Enterprise plans; the Starter plan has API access to `breach-search` only.\n\nFind.ly serves its own modules. Most are powered by our search provider, Intelligence X — `intelligence-search`, `phonebook`, `identity-portal`, `system-id`, `storage-id` and the Stealer Export archive. `breach-search` is ours: it runs on a breach index Find.ly ingests and documents itself, on its own separate daily quota.\n\nEvery search is `POST /api/v1/search/{module}`. Each module has its own reference page below because each takes a different body."
   },
   "servers": [
     {
@@ -41,7 +41,7 @@
           "Account"
         ],
         "summary": "Get usage",
-        "description": "Returns the plan, both of today's quotas (`usage` for IntelX requests, `breach_usage` for Breach Search) and the modules open to the account that owns the key. Never billed and never runs a search: use it to check that a key works.",
+        "description": "Returns the plan, both of today's quotas (`usage` for IntelX requests, `breach_usage` for Breach Search) and the modules open to the account that owns the key. Never billed and never runs a search: use it to check that a key works. It answers on Starter too, whose key otherwise only reaches `breach-search`.",
         "responses": {
           "200": {
             "description": "Plan, both quotas and modules. `billed` is always `false`. The `X-Quota-*` headers describe the IntelX quota.",
@@ -83,9 +83,9 @@
                       "breach_usage": {
                         "plan": "Professional",
                         "plan_expires_at": "2026-10-16T12:00:00.000Z",
-                        "daily_quota": 800,
+                        "daily_quota": 2000,
                         "used": 3,
-                        "remaining": 797,
+                        "remaining": 1997,
                         "resets_at": "2026-09-17T00:00:00.000Z"
                       },
                       "billed": false,
@@ -174,7 +174,7 @@
             }
           },
           "403": {
-            "description": "Access refused. `account_suspended`, or `plan_required` (the plan has no API access; carries `usage` and `X-Quota-*`).",
+            "description": "Access refused. `account_suspended`, or `plan_required` (the plan has no API access: Free, or a plan that ended; carries `usage` and `X-Quota-*`).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -211,16 +211,16 @@
                     "value": {
                       "error": {
                         "code": "plan_required",
-                        "message": "Your Starter plan doesn’t include API access. It comes with the Professional and Enterprise plans.",
-                        "plan": "Starter"
+                        "message": "Your Free plan doesn't include API access. It comes with the Professional and Enterprise plans.",
+                        "plan": "Free"
                       },
                       "billed": false,
                       "usage": {
-                        "plan": "Starter",
-                        "plan_expires_at": "2026-10-16T12:00:00.000Z",
-                        "daily_quota": 100,
+                        "plan": "Free",
+                        "plan_expires_at": null,
+                        "daily_quota": 3,
                         "used": 0,
-                        "remaining": 100,
+                        "remaining": 3,
                         "resets_at": "2026-09-17T00:00:00.000Z"
                       }
                     }
@@ -506,7 +506,7 @@
             }
           },
           "403": {
-            "description": "`account_suspended`, `plan_required`, or `module_locked` (the plan does not include this module; carries `required_plan`). `module_locked` only happens if the plan expires during the call.",
+            "description": "`account_suspended`, `plan_required` (no API access on Free or after a plan ends, or a Starter key: Starter's API access covers Breach Search only), or `module_locked` (the plan does not include this module; carries `required_plan`). `module_locked` only happens if the plan expires during the call.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -543,7 +543,7 @@
                     "value": {
                       "error": {
                         "code": "plan_required",
-                        "message": "Your Starter plan doesn’t include API access. It comes with the Professional and Enterprise plans.",
+                        "message": "Your Starter plan only includes Breach Search API access. Upgrade to Professional and Enterprise for full API access including IntelX modules.",
                         "plan": "Starter"
                       },
                       "billed": false,
@@ -1048,7 +1048,7 @@
             }
           },
           "403": {
-            "description": "`account_suspended`, `plan_required`, or `module_locked` (the plan does not include this module; carries `required_plan`). `module_locked` only happens if the plan expires during the call.",
+            "description": "`account_suspended`, `plan_required` (no API access on Free or after a plan ends, or a Starter key: Starter's API access covers Breach Search only), or `module_locked` (the plan does not include this module; carries `required_plan`). `module_locked` only happens if the plan expires during the call.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -1085,7 +1085,7 @@
                     "value": {
                       "error": {
                         "code": "plan_required",
-                        "message": "Your Starter plan doesn’t include API access. It comes with the Professional and Enterprise plans.",
+                        "message": "Your Starter plan only includes Breach Search API access. Upgrade to Professional and Enterprise for full API access including IntelX modules.",
                         "plan": "Starter"
                       },
                       "billed": false,
@@ -1548,7 +1548,7 @@
             }
           },
           "403": {
-            "description": "`account_suspended`, `plan_required`, or `module_locked` (the plan does not include this module; carries `required_plan`). `module_locked` only happens if the plan expires during the call.",
+            "description": "`account_suspended`, `plan_required` (no API access on Free or after a plan ends, or a Starter key: Starter's API access covers Breach Search only), or `module_locked` (the plan does not include this module; carries `required_plan`). `module_locked` only happens if the plan expires during the call.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -1585,7 +1585,7 @@
                     "value": {
                       "error": {
                         "code": "plan_required",
-                        "message": "Your Starter plan doesn’t include API access. It comes with the Professional and Enterprise plans.",
+                        "message": "Your Starter plan only includes Breach Search API access. Upgrade to Professional and Enterprise for full API access including IntelX modules.",
                         "plan": "Starter"
                       },
                       "billed": false,
@@ -2077,7 +2077,7 @@
             }
           },
           "403": {
-            "description": "`account_suspended` or `plan_required`.",
+            "description": "`account_suspended` or `plan_required` (no API access on Free or after a plan ends, or a Starter key: Starter's API access covers Breach Search only).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -2114,7 +2114,7 @@
                     "value": {
                       "error": {
                         "code": "plan_required",
-                        "message": "Your Starter plan doesn’t include API access. It comes with the Professional and Enterprise plans.",
+                        "message": "Your Starter plan only includes Breach Search API access. Upgrade to Professional and Enterprise for full API access including IntelX modules.",
                         "plan": "Starter"
                       },
                       "billed": false,
@@ -2591,7 +2591,7 @@
             }
           },
           "403": {
-            "description": "`account_suspended` or `plan_required`.",
+            "description": "`account_suspended` or `plan_required` (no API access on Free or after a plan ends, or a Starter key: Starter's API access covers Breach Search only).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -2628,7 +2628,7 @@
                     "value": {
                       "error": {
                         "code": "plan_required",
-                        "message": "Your Starter plan doesn’t include API access. It comes with the Professional and Enterprise plans.",
+                        "message": "Your Starter plan only includes Breach Search API access. Upgrade to Professional and Enterprise for full API access including IntelX modules.",
                         "plan": "Starter"
                       },
                       "billed": false,
@@ -2961,7 +2961,7 @@
             }
           },
           "403": {
-            "description": "`plan_required` (no API access) or `module_locked` (the plan does not include Stealer Export). Not billed.",
+            "description": "`plan_required` (no API access) or `module_locked` (the plan does not include Stealer Export, as on Starter). Not billed.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -3099,7 +3099,7 @@
           "Search"
         ],
         "summary": "Breach Search",
-        "description": "FindLy Module. Find one person's records across Find.ly's own breach index. Send a free-text `query` (the base request), an advanced `fields` object (every field must match), or both. Returns up to 100 records. Draws from its own daily Breach Search bucket (Professional 800, Enterprise 5,000), never from the IntelX request quota.",
+        "description": "FindLy Module. Find one person's records across Find.ly's own breach index. Send a free-text `query` (the base request), an advanced `fields` object (every field must match), or both. Returns up to 100 records. Draws from its own daily Breach Search bucket (Starter 500, Professional 2,000, Enterprise 5,000), never from the IntelX request quota. It is the only module a Starter key can call.",
         "parameters": [
           {
             "name": "format",
@@ -3205,9 +3205,9 @@
                       "usage": {
                         "plan": "Professional",
                         "plan_expires_at": "2026-10-16T12:00:00.000Z",
-                        "daily_quota": 800,
+                        "daily_quota": 2000,
                         "used": 12,
-                        "remaining": 788,
+                        "remaining": 1988,
                         "resets_at": "2026-09-24T00:00:00.000Z"
                       }
                     }
@@ -3242,7 +3242,7 @@
             }
           },
           "403": {
-            "description": "`account_suspended`, `plan_required` (no API access) or `module_locked` (the plan has no Breach Search bucket).",
+            "description": "`account_suspended` or `plan_required` (the plan has no API access: Free, or a plan that ended). Starter, Professional and Enterprise keys can all call Breach Search.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3308,8 +3308,8 @@
                       "usage": {
                         "plan": "Professional",
                         "plan_expires_at": "2026-10-16T12:00:00.000Z",
-                        "daily_quota": 800,
-                        "used": 800,
+                        "daily_quota": 2000,
+                        "used": 2000,
                         "remaining": 0,
                         "resets_at": "2026-09-24T00:00:00.000Z"
                       }
@@ -3486,7 +3486,7 @@
           },
           "daily_quota": {
             "type": "integer",
-            "description": "Requests per day in this quota. IntelX requests: 500 on Professional, 1,500 on Enterprise. Breach Search: 800 on Professional, 5,000 on Enterprise."
+            "description": "Requests per day in this quota. IntelX requests: 3 on Free, 100 on Starter, 500 on Professional, 1,500 on Enterprise. Breach Search: 3 on Free, 500 on Starter, 2,000 on Professional, 5,000 on Enterprise."
           },
           "used": {
             "type": "integer",
@@ -3505,7 +3505,7 @@
       },
       "ErrorCode": {
         "type": "string",
-        "description": "Stable, machine-readable error code:\n\n- `api_key_in_url`: 400 — an API key was sent in the query string (`key`, `api_key`, `apikey`, `token` or `access_token`).\n- `invalid_json`: 400 — the body is missing, is not valid UTF-8 JSON, or is not a JSON object.\n- `unsupported_format`: 400 — `format` is not `json`, or `txt` was asked for a module that has no text output (Intelligence Search, Identity Portal, Breach Search).\n- `missing_api_key`: 401 — neither `Authorization` nor `X-API-Key` was sent.\n- `invalid_api_key`: 401 — the key is malformed, unknown, regenerated, or belongs to a deleted account.\n- `account_suspended`: 403 — the account that owns the key is suspended.\n- `plan_required`: 403 — the account plan does not include API access (Professional and Enterprise only).\n- `module_locked`: 403 — the account plan does not include this module (Stealer Export needs Professional or Enterprise).\n- `unknown_module`: 404 — `{module}` is not a search module slug.\n- `not_a_search_module`: 400 — `stealer-export` was called as a search module. Use `POST /api/v1/stealer-export`.\n- `not_found`: 404 — no API endpoint at this path, or a Stealer Export whose System ID has no logs attached (the request is given back).\n- `body_too_large`: 413 — the request body is over 16 KB.\n- `invalid_input`: 422 — a field is unknown, has the wrong type, or has an invalid value. See `error.fields` (Breach Search advanced fields are keyed `fields.<name>`).\n- `too_many_requests`: 429 — more than 60 API calls in one minute from the same IP address (no `reason`), or a limit of the whole service: `reason` is `server-busy` (Find.ly already runs as many searches as it can: 3 IntelX, 6 Breach Search) or `service-paused` (the search service refused or was saturated a moment ago).\n- `quota_exceeded`: 429 — no requests left today in the quota this call draws from (IntelX requests, or the Breach Search bucket). Carries `usage` for that quota.\n- `rate_limited`: 429 — a limit of this account: `reason` is `concurrent` (two searches or an export already running), `per-minute` (20 in the last minute) or `refund-cap` (too many IntelX requests given back today; carries `usage`).\n- `internal_error`: 500 — unexpected server error. No request was used.\n- `upstream_error`: 502 — the search or export service (Intelligence X, or Find.ly's breach index for Breach Search) failed, timed out (30 s IntelX, 20 s Breach Search), or sent an unreadable or oversized response (an archive over 32 MB). The request is refunded.",
+        "description": "Stable, machine-readable error code:\n\n- `api_key_in_url`: 400 — an API key was sent in the query string (`key`, `api_key`, `apikey`, `token` or `access_token`).\n- `invalid_json`: 400 — the body is missing, is not valid UTF-8 JSON, or is not a JSON object.\n- `unsupported_format`: 400 — `format` is not `json`, or `txt` was asked for a module that has no text output (Intelligence Search, Identity Portal, Breach Search).\n- `missing_api_key`: 401 — neither `Authorization` nor `X-API-Key` was sent.\n- `invalid_api_key`: 401 — the key is malformed, unknown, regenerated, or belongs to a deleted account.\n- `account_suspended`: 403 — the account that owns the key is suspended.\n- `plan_required`: 403 — the account plan does not include API access (Free, or a plan that ended), or a Starter key called a module other than `breach-search` (Starter's API access covers Breach Search only; Professional and Enterprise have full access).\n- `module_locked`: 403 — the account plan does not include this module (Stealer Export needs Professional or Enterprise).\n- `unknown_module`: 404 — `{module}` is not a search module slug.\n- `not_a_search_module`: 400 — `stealer-export` was called as a search module. Use `POST /api/v1/stealer-export`.\n- `not_found`: 404 — no API endpoint at this path, or a Stealer Export whose System ID has no logs attached (the request is given back).\n- `body_too_large`: 413 — the request body is over 16 KB.\n- `invalid_input`: 422 — a field is unknown, has the wrong type, or has an invalid value. See `error.fields` (Breach Search advanced fields are keyed `fields.<name>`).\n- `too_many_requests`: 429 — more than 60 API calls in one minute from the same IP address (no `reason`), or a limit of the whole service: `reason` is `server-busy` (Find.ly already runs as many searches as it can: 3 IntelX, 6 Breach Search) or `service-paused` (the search service refused or was saturated a moment ago).\n- `quota_exceeded`: 429 — no requests left today in the quota this call draws from (IntelX requests, or the Breach Search bucket). Carries `usage` for that quota.\n- `rate_limited`: 429 — a limit of this account: `reason` is `concurrent` (two searches or an export already running), `per-minute` (20 in the last minute) or `refund-cap` (too many IntelX requests given back today; carries `usage`).\n- `internal_error`: 500 — unexpected server error. No request was used.\n- `upstream_error`: 502 — the search or export service (Intelligence X, or Find.ly's breach index for Breach Search) failed, timed out (30 s IntelX, 20 s Breach Search), or sent an unreadable or oversized response (an archive over 32 MB). The request is refunded.",
         "enum": [
           "api_key_in_url",
           "invalid_json",
@@ -3608,7 +3608,7 @@
           },
           "modules": {
             "type": "array",
-            "description": "Module slugs open to this plan: the IntelX modules, `breach-search` and `stealer-export`.",
+            "description": "Module slugs open to this plan in the dashboard: the IntelX modules, `breach-search` and `stealer-export`. On Starter, only `breach-search` can be called through the API.",
             "items": {
               "type": "string",
               "enum": [
@@ -3624,7 +3624,7 @@
           },
           "breach_usage": {
             "$ref": "#/components/schemas/Usage",
-            "description": "Today's Breach Search bucket (800 a day on Professional, 5,000 on Enterprise), in the same shape as `usage`."
+            "description": "Today's Breach Search bucket (500 a day on Starter, 2,000 on Professional, 5,000 on Enterprise), in the same shape as `usage`."
           },
           "billed": {
             "type": "boolean",

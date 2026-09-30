@@ -44,7 +44,10 @@ The key is checked again on each call, so changes apply immediately:
 | Header present | `401 missing_api_key` |
 | Key known and account exists | `401 invalid_api_key` |
 | Account not suspended | `403 account_suspended` |
-| Plan includes API access (Professional or Enterprise) | `403 plan_required` |
+| Plan includes API access (Starter, Professional or Enterprise) | `403 plan_required` |
+| On Starter, the module is Breach Search | `403 plan_required` |
+
+Professional and Enterprise have full API access. Starter has **limited** API access: its key works on `POST /api/v1/search/breach-search` and `GET /api/v1/usage` only, and any other search module returns `403 plan_required` (Stealer Export returns `403 module_locked`, as in the dashboard). Free has no API access.
 
 When a paid plan ends, the account falls back to Free and the key gets `403 plan_required` until you renew. Plans do not renew automatically. None of these refusals uses a request.
 
@@ -61,4 +64,4 @@ curl https://findly.icu/api/v1/usage -H "Authorization: Bearer $FINDLY_API_KEY"
 
 ## Test a key
 
-`GET /api/v1/usage` is never billed and never runs a search. A `200` response means the key works and the plan includes API access; its body gives both of today's quotas (`usage` for IntelX requests, `breach_usage` for Breach Search).
+`GET /api/v1/usage` is never billed and never runs a search. A `200` response means the key works and the plan includes API access (on Starter, Breach Search only); its body gives both of today's quotas (`usage` for IntelX requests, `breach_usage` for Breach Search).

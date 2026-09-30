@@ -34,7 +34,7 @@ Every error has the same JSON shape:
 | 401 | `missing_api_key` | | No `Authorization` or `X-API-Key` header | Add the header |
 | 401 | `invalid_api_key` | | Malformed, unknown or regenerated key | Copy the current key from the dashboard |
 | 403 | `account_suspended` | | The account is suspended | Contact support |
-| 403 | `plan_required` | `plan` | The plan has no API access (not Professional or Enterprise, or the plan ended) | Upgrade or renew |
+| 403 | `plan_required` | `plan` | The plan has no API access (Free, or the plan ended), or a Starter key called a module other than Breach Search | Upgrade or renew |
 | 403 | `module_locked` | `required_plan` | The plan does not include this module | Upgrade to `required_plan` |
 | 404 | `unknown_module` | | `{module}` is not a module slug | Use a valid module slug |
 | 404 | `not_found` | | No endpoint at this path, or a Stealer Export with no logs attached | Check the URL; for an export, the request was given back |
@@ -103,7 +103,7 @@ A search is checked in this order, and the first failure is returned:
 1. IP rate limit (`too_many_requests`)
 2. Key in the URL (`api_key_in_url`)
 3. Key (`missing_api_key`, `invalid_api_key`), account (`account_suspended`), plan (`plan_required`)
-4. Module slug (`unknown_module`)
+4. Module slug (`unknown_module`), then, on Starter, a module other than Breach Search (`plan_required`)
 5. `format` (`unsupported_format`)
 6. Body size and JSON (`body_too_large`, `invalid_json`)
 7. Fields (`invalid_input`)

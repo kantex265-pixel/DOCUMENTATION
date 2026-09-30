@@ -33,7 +33,7 @@ Nothing else. Unknown fields are rejected with `422 invalid_input`, so a typo su
 | Given back | service failure, timeout, no logs found, archive over 32 MB |
 | Concurrency | one export at a time per account |
 
-A `403 module_locked` on Free or Starter costs nothing and never reaches the export service.
+A `403 module_locked` on Starter (or `403 plan_required` on Free, which has no API access) costs nothing and never reaches the export service.
 
 ## Call it
 

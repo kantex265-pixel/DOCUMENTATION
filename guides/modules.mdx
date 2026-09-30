@@ -20,7 +20,7 @@ POST https://findly.icu/api/v1/search/{module}
 | `storage-id` | A raw file, by storage ID and bucket | `storage_id`, `bucket` | Yes: the file |
 | `breach-search` | A person's records across our own breach index | `query`, `fields` | No |
 
-Professional and Enterprise include every search module (and Stealer Export, below). An unknown slug returns `404 unknown_module`.
+Professional and Enterprise include every search module (and Stealer Export, below). Starter's API access covers `breach-search` only: any other module returns `403 plan_required`. An unknown slug returns `404 unknown_module`.
 
 <Note>
   **`breach-search` draws from its own daily bucket**, not the IntelX request quota — see
@@ -193,8 +193,8 @@ An unknown or sensitive key returns `422 invalid_input` (as `fields.<key>`) and 
 - A search that takes over 20 seconds is refunded (`502 upstream_error`). If the index runs out of its own time budget, it returns what it found with `partial: true`; an empty partial result is refunded.
 
 <Note>
-  Breach Search uses a **separate daily bucket** (Starter 100, Professional 800, Enterprise 5,000), independent of the
-  IntelX request quota. See [Billing and quotas](/guides/billing-and-quotas#daily-quotas).
+  Breach Search uses a **separate daily bucket** (Starter 500, Professional 2,000, Enterprise 5,000), independent of
+  the IntelX request quota. It is the only module a Starter key can call. See [Billing and quotas](/guides/billing-and-quotas#daily-quotas).
 </Note>
 
 ## Responses
